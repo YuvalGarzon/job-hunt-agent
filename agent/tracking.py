@@ -299,7 +299,9 @@ def morning_jobs(sheet: Sheet, log=print) -> bool:
     if sheet.kv_get("Settings", "paused", "no") == "yes":
         return False
     sheet.load("Jobs", "Applications")
-    if not alerts.pending_rows(sheet):
+    # only jobs from before today: the ones sent this morning were just seen (on the very first
+    # run, the first batch and this list would be the same cards twice)
+    if not any(r["First seen"][:10] < today for r in alerts.pending_rows(sheet)):
         return False
     tg.send_message("☀️ <b>Good morning!</b> These jobs are still waiting for your decision:")
     alerts.send_pending(sheet)

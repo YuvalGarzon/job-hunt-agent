@@ -1028,7 +1028,7 @@ def cmd_company(sheet, arg, ctx):
     sheet.flush()
     from agent import country
     tg.send_message(f"🏢 Now watching <b>{tg.esc(found['name'])}</b> ({tg.esc(found['ats'])}): "
-                    f"{found['jobs']} open jobs, {found['local']} in {tg.esc(country.name())}. "
+                    f"{alerts.count(found['jobs'], 'open job')}, {found['local']} in {tg.esc(country.name())}. "
                     "The ones that fit will come to you as cards.")
 
 

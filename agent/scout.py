@@ -18,7 +18,7 @@ from datetime import datetime
 
 import requests
 
-from agent import claude_cli, config, country, filters, learn, sources
+from agent import alerts, claude_cli, config, country, filters, learn, sources
 from agent import telegram as tg
 from agent.sheet import TZ, Sheet, now_iso
 from agent.sources import ats
@@ -141,7 +141,7 @@ def scout(sheet: Sheet, notify: bool = True, log=print) -> tuple:
                     "Careers": careers, "Found by": "scout"})
         added += 1
         watched += bool(kind)
-        log(f"scout: {name}: " + (f"{kind} board, {len(jobs)} local jobs" if kind else "no public board"))
+        log(f"scout: {name}: " + (f"{kind} board, {alerts.count(len(jobs), 'local job')}" if kind else "no public board"))
         if notify and sent < MAX_MESSAGES:
             tell(name, c, kind, jobs, fit, careers)
             sent += 1
@@ -152,7 +152,7 @@ def scout(sheet: Sheet, notify: bool = True, log=print) -> tuple:
 def run_task(sheet: Sheet, task: dict, payload: dict, log) -> str:
     found, added, watched = scout(sheet, log=log)
     log(f"scout: {found} suggested, {added} new, {watched} watched")
-    return f"{added} new companies"
+    return f"{added} new compan{'y' if added == 1 else 'ies'}"
 
 
 def _cb(key: str) -> str:
@@ -167,8 +167,8 @@ def tell(name: str, c: dict, kind: str, jobs: list, fit: list, careers: str) -> 
         if c.get(k):
             lines.append(e(str(c[k])[:200]))
     if kind:
-        lines.append(f"👀 Added to the search: {len(jobs)} open jobs in {e(country.name())}"
-                     + (f", {len(fit)} pass the first filters. The ones that fit will come to you as cards." if fit
+        lines.append(f"👀 Added to the search: {alerts.count(len(jobs), 'open job')} in {e(country.name())}"
+                     + (f", {len(fit)} pass{'es' if len(fit) == 1 else ''} the first filters. The ones that fit will come to you as cards." if fit
                         else ". None fits right now, but I'll watch it and send one when it does."))
     else:
         lines.append("ℹ️ It has no public job board, so I can't watch it. Its careers page is worth a look.")

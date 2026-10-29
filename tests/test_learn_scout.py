@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from agent import bot, learn, scout, tracking
 from agent.jobs import Job
@@ -44,6 +44,10 @@ def test_skip_reasons_lower_similar_jobs(sheet, sent):
 def test_morning_jobs_once_a_day(sheet, sent, monkeypatch):
     monkeypatch.setattr(tracking, "datetime", type("D", (), {"now": staticmethod(lambda tz=None: datetime.now(TZ).replace(hour=9))}))
     sheet.t("Jobs").rows[0]["First seen"] = datetime.now(TZ).isoformat()
+    assert tracking.morning_jobs(sheet) is False                 # only today's cards: just seen, not sent again
+    assert not any("Good morning" in m for m in sent)
+    sheet.kv_set("Health", "morning_date", "")
+    sheet.t("Jobs").rows[0]["First seen"] = (datetime.now(TZ) - timedelta(days=1)).isoformat()
     assert tracking.morning_jobs(sheet) is True
     assert any("Good morning" in m for m in sent)
     assert tracking.morning_jobs(sheet) is False
@@ -67,7 +71,7 @@ def test_scout_watches_boards_and_suggests(sheet, sent, monkeypatch):
     rows = {r["Company"]: r for r in sheet.t("Boards").rows}
     assert (rows["Nova Data"]["Status"], rows["Nova Data"]["Board"]) == ("found", "novadata")
     assert rows["Quiet Co"]["Status"] == "suggested" and "Northwind" not in rows
-    assert "1 open jobs in United Kingdom" in sent[-2] and "no public job board" in sent[-1]
+    assert "1 open job in United Kingdom, 1 passes" in sent[-2] and "no public job board" in sent[-1]
 
     key = scout._cb("novadata")
     bot.handle(sheet, cb(f"cocv:{key}", 7), by="mac", mac_online=True)

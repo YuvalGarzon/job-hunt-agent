@@ -95,7 +95,9 @@ def detect(query: str) -> tuple:
             hit = check(_name_from(q, kind, board), kind, board)
             if hit:
                 return hit, ""
-        return None, "The job board on that page didn't answer. Try again later."
+        kind, board = tries[0]
+        return None, (f"I found a {kind} job board '{board}' in that link, but it doesn't answer: check the link "
+                      "(the board may not exist), or try again later.")
     for slug in _slugs(q):
         for kind in ("greenhouse", "ashby", "lever"):
             hit = check(q, kind, slug)

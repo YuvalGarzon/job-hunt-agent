@@ -8,9 +8,15 @@ from agent.sources import board_mail
 BATCH_SIZE = 10
 
 
+def count(n: int, word: str) -> str:
+    """'1 open job', '3 open jobs'."""
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
 def job_text(r: dict, number: int) -> str:
     e = tg.esc
-    place = r["City"] or ("location?" if r["Location flag"] else r["Location"][:40]) or "location?"
+    remote = re.search(r"\bremote\b", r.get("Location") or "", re.I)
+    place = r["City"] or ("Remote" if remote else "location?" if r["Location flag"] else r["Location"][:40]) or "location?"
     lines = [f"<b>{number}. {e(r['Title'])}</b>",
              f"🏢 {e(r['Company'])} · 📍 {e(place)} · ⭐ <b>{e(r['Score'])}</b>"]
     fit = (r.get("Fit") or "").split("\n")

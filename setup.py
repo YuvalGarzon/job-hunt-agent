@@ -312,7 +312,7 @@ def review_profile(data: dict) -> None:
             say(f"{DIM}strong = you can answer in depth in an interview; used = used in a real project.{END}")
         if name == "CV rules":
             say(f"{DIM}titles_held: the only titles the CV may open with — titles you can truthfully claim.{END}")
-        if not yes(f"Is the {name.lower()} part right?"):
+        if not yes(f"Is the {name if name.startswith('CV') else name.lower()} part right?"):
             wrong.append(name)
     if wrong:
         say(f"Fix these parts in PROFILE.yaml: {', '.join(wrong)}. Add anything missing; remove anything untrue.")
@@ -525,7 +525,7 @@ def step_companies() -> None:
     if gone:
         ok(f"Removed {len(gone)}")
 
-    from agent import company_add
+    from agent import alerts, company_add
     say("\nAdd companies you want to watch: paste a company's careers page link, or just its name.")
     say(f"{DIM}The agent reads Greenhouse, Lever, Ashby, Comeet and Workday job boards; it finds which one a{END}")
     say(f"{DIM}company uses. Companies on other systems can still reach you through job-alert emails.{END}")
@@ -541,7 +541,7 @@ def step_companies() -> None:
         if company_add.known(found, [c["name"] for c in comps]):
             warn(f"{found['name']} is already on the list.")
             continue
-        ok(f"{found['name']}: a {found['ats']} board with {found['jobs']} open jobs, "
+        ok(f"{found['name']}: a {found['ats']} board with {alerts.count(found['jobs'], 'open job')}, "
            f"{found['local']} in {settings_country()}")
         name = ask("  Company name", found["name"])
         favorite = yes("  Is it one of your favorite companies (its jobs score higher)?", False)
@@ -559,7 +559,8 @@ def step_companies() -> None:
     except Exception as e:
         warn(f"The company search failed: {e.__class__.__name__}: {e}")
         return
-    ok(f"{added} new companies; {watched} have a public job board and are now watched every run")
+    ok(f"{added} new compan{'y' if added == 1 else 'ies'} found; {watched} with a public job board, "
+       "now watched every run")
     say(f"{DIM}The agent keeps looking for more every day at 11:00 and tells you on Telegram.{END}")
 
 

@@ -226,3 +226,10 @@ def test_card_shows_one_location_pin_and_who_sent_it():
     assert text.count("📍") == 1 and "location?" in text and "you sent it from the company site" in text
     row["URL"] = "https://www.linkedin.com/jobs/view/1/"
     assert "not verified on the company site" in alerts.job_text(row, 1)
+
+
+def test_remote_jobs_show_remote_on_the_card():
+    from agent import alerts
+    row = {"Title": "Software Engineer", "Company": "Acme", "City": "", "Location": "Remote - UK",
+           "Location flag": "location?", "Score": 66, "Source": "greenhouse", "URL": "https://x"}
+    assert "📍 Remote" in alerts.job_text(row, 1)
