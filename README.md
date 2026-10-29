@@ -65,7 +65,7 @@ send email to you.
 ### 1. Get the code
 
 ```bash
-git clone https://github.com/<you>/job-hunt-agent.git
+git clone https://github.com/YuvalGarzon/job-hunt-agent.git
 cd job-hunt-agent
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-mac.txt
