@@ -1,4 +1,4 @@
-"""Queue tasks that need the Mac (Claude, the CV renderer). Each task is resumable:
+"""Queue tasks that need the computer (Claude, the CV renderer). Each task is resumable:
 status pending -> in_progress -> done | failed, with attempts and updated_at.
 A task stuck in_progress for more than 15 minutes (shutdown mid-build) is run again.
 """

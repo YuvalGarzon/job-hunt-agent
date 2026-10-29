@@ -1,4 +1,4 @@
-"""Writing and prep (step 7), all on the Mac through Claude: cover letters, interview prep,
+"""Writing and prep (step 7), all on the computer through Claude: cover letters, interview prep,
 mock interviews and free chat. Everything written about the user comes from PROFILE.yaml only
 and passes truth_check.check_text before it is shown. The user sends everything themselves.
 """

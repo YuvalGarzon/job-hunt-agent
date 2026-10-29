@@ -1,9 +1,9 @@
-"""Copy secrets from the macOS Keychain (service "job-hunt-agent") into your repo's GitHub
+"""Copy secrets from your system's keychain (service "job-hunt-agent") into your repo's GitHub
 Actions Secrets (only for the optional cloud mode). Values go through stdin to `gh secret set`
 and are never printed.
 
-Usage: .venv/bin/python scripts/push_secret.py NAME [NAME ...]
-       .venv/bin/python scripts/push_secret.py --all
+Usage: python scripts/push_secret.py NAME [NAME ...]
+       python scripts/push_secret.py --all
 """
 import subprocess
 import sys
@@ -34,7 +34,7 @@ def main() -> None:
         f = ROOT / FILES[name] if name in FILES else None
         value = f.read_text(encoding="utf-8") if f and f.exists() else keyring.get_password(SERVICE, name)
         if not value:
-            print(f"{name}: not in the Keychain, skipped")
+            print(f"{name}: not in the system keychain, skipped")
             continue
         r = subprocess.run(["gh", "secret", "set", name, "-R", REPO], input=value,
                            text=True, capture_output=True)

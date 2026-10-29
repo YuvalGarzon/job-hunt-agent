@@ -1,7 +1,7 @@
-"""Store one secret in the macOS Keychain (service "job-hunt-agent") with hidden input.
+"""Store one secret in your system's keychain (service "job-hunt-agent") with hidden input.
 
-Usage (in the Terminal app):
-    .venv/bin/python scripts/set_secret.py TELEGRAM_BOT_TOKEN
+Usage (in a terminal, from the project folder, with .venv active):
+    python scripts/set_secret.py TELEGRAM_BOT_TOKEN
 
 The value is read with hidden input and never printed or written to disk.
 For multi-line values (a service-account JSON), paste it and finish with an empty line.
@@ -34,7 +34,7 @@ def main() -> None:
     if not value:
         sys.exit("empty value, nothing saved")
     keyring.set_password(SERVICE, name, value)
-    print(f"saved {name} in the Keychain ({len(value)} characters)")
+    print(f"saved {name} in the system keychain ({len(value)} characters)")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 The user's own files (created by setup.py, never committed): PROFILE.yaml, settings.yaml,
 companies.yaml and base_cv.yaml in the project folder. Tests point these paths at examples/.
 """
+import platform
 from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -79,9 +80,9 @@ def cv_root() -> Path:
 
 
 def where_saved(path) -> str:
-    """Where a file is, as Telegram HTML: its name and the full path on the Mac (tap to copy).
-    A file under Desktop or Documents is also shown as it appears in the iPhone Files app,
-    for Macs that sync those folders to iCloud Drive."""
+    """Where a file is, as Telegram HTML: its name and the full path on the computer (tap to copy).
+    On macOS, a file under Desktop or Documents is also shown as it appears in the iPhone Files
+    app, for Macs that sync those folders to iCloud Drive."""
     path = Path(path)
     if not path.is_absolute():
         path = ROOT / path
@@ -93,6 +94,6 @@ def where_saved(path) -> str:
     esc = lambda x: str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")  # noqa: E731
     lines = [f"💾 File: <b>{esc(path.name)}</b>"] if path.suffix else []
     lines.append(f"📁 Path: <code>{esc(path)}</code>")
-    if rel is not None and rel.parts and rel.parts[0] in ("Desktop", "Documents"):
+    if platform.system() == "Darwin" and rel is not None and rel.parts and rel.parts[0] in ("Desktop", "Documents"):
         lines.append(f"📱 iPhone (with iCloud Desktop sync): Files › iCloud Drive › {esc(' › '.join(rel.parts))}")
     return "\n".join(lines)

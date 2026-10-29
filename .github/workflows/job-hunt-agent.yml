@@ -1,6 +1,6 @@
 name: job-hunt-agent
 
-# OPTIONAL cloud backup: searches and answers Telegram while your Mac is asleep. The Mac worker
+# OPTIONAL cloud backup: searches and answers Telegram while your computer is asleep. The worker on your computer
 # is the main way to run the agent; see "Cloud mode" in the README before turning this on.
 # Use it ONLY in a PRIVATE copy of this repo: Actions logs of a public repo are public.
 #

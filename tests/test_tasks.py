@@ -126,7 +126,12 @@ def test_cv_caption_keeps_the_save_location():
     where = config.where_saved("CVs/ML Engineer CV/Acme - Engineer - 2026-10-23/Alex Morgan CV.pdf")
     assert "<b>Alex Morgan CV.pdf</b>" in where
     assert f"<code>{config.ROOT}/CVs/ML Engineer CV/Acme - Engineer - 2026-10-23/Alex Morgan CV.pdf</code>" in where
-    in_icloud = config.ROOT.relative_to(Path.home()).parts[0] in ("Desktop", "Documents")
+    import platform
+    try:
+        top = config.ROOT.relative_to(Path.home()).parts[0]
+    except ValueError:
+        top = ""
+    in_icloud = platform.system() == "Darwin" and top in ("Desktop", "Documents")
     assert ("iCloud Drive" in where) == in_icloud
     if in_icloud:
         assert f"{config.ROOT.name} › CVs › ML Engineer CV › Acme - Engineer - 2026-10-23" in where

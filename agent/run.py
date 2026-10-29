@@ -1,14 +1,14 @@
-"""One run: the Mac worker (every 15 min by day, every 2 h at night, while the Mac is awake),
+"""One run: the worker on your computer (every 15 min by day, every 2 h at night, while it is awake),
 the optional GitHub Actions backup (same rhythm), or by hand:
 
     python -m agent.run [--no-send] [--force]
 
-GitHub's schedule is best effort (it often skips slots), so the Mac worker is the main
+GitHub's schedule is best effort (it often skips slots), so the worker on your computer is the main
 searcher while it is awake and the cloud is an optional backup: the search
 step runs only when it is due (no search in the last 14 min by day / 115 min at night) and
 only under a lock in the Sheet, so the two never search at once and never alert twice.
 
-1. Telegram failover: if the Mac's heartbeat is older than 10 minutes, this run consumes
+1. Telegram failover: if the computer's heartbeat is older than 10 minutes, this run consumes
    Telegram updates (Inbox first) and handles them; CV work waits in the Queue.
 2. Re-sends any alert recorded but not sent (crash safety), then finds and alerts new jobs.
 3. Once a day: checks that every GitHub link on the CVs is still public.
@@ -54,7 +54,7 @@ def telegram_failover(sheet: Sheet) -> None:
         updates = tg.get_updates(timeout=0)
     except tg.TelegramError as e:
         if "409" in str(e) or "Conflict" in str(e):
-            say("telegram: the Mac is polling after all; leaving updates to it")
+            say("telegram: the computer is polling after all; leaving updates to it")
             return
         raise
     if updates:
@@ -83,8 +83,8 @@ def gmail_expiry_reminder(sheet: Sheet) -> None:
     when = (f"expires in about {max(1, int(left.total_seconds() // 3600))} hours" if left > timedelta(0)
             else "has expired, so the job-alert emails are not being read")
     tg.send_message(f"🔑 The agent's Gmail access {when}.\n"
-                    "To renew it (one minute), in the Mac's Terminal:\n"
-                    f"<code>cd {tg.esc(config.ROOT)} && .venv/bin/python scripts/gmail_auth.py</code>\n"
+                    "To renew it (one minute), in a terminal on your computer:\n"
+                    f"<code>cd \"{tg.esc(config.ROOT)}\" && \"{tg.esc(sys.executable)}\" scripts/gmail_auth.py</code>\n"
                     "A browser opens: sign in and allow.\n"
                     "To stop this weekly expiry, publish the OAuth app (see the README, Gmail step).")
     sheet.kv_set("Health", "gmail_reminded", today)
@@ -170,7 +170,7 @@ def release_find(sheet: Sheet, token: str, key: str = "find_lock") -> None:
 
 def tracking_step(sheet: Sheet, owner: str, log=None) -> None:
     """Mail scan, follow-ups, 09:00 open jobs, 18:00 digest, 22:00 email: only when one is due, and under the
-    'daily_lock', so the Mac and the cloud never send the same thing twice."""
+    'daily_lock', so the computer and the cloud never send the same thing twice."""
     from agent import gmail, openness, tracking
     log = log or say
     sheet.load("Health")

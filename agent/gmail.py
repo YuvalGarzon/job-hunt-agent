@@ -1,6 +1,6 @@
 """Gmail API over plain HTTPS.
 
-The refresh token comes from the Keychain (Mac) or GitHub Secrets (cloud); the short-lived
+The refresh token comes from the system keychain (computer) or GitHub Secrets (cloud); the short-lived
 access tokens live only in memory. Reading uses a token narrowed to gmail.readonly; sending
 uses one narrowed to gmail.send, and send_to_self() can only write to the user's own address
 (read from the Gmail profile; there is no recipient parameter). Nothing here can change or

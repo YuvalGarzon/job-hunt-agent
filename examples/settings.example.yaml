@@ -44,7 +44,7 @@ email_alerts:
 # Cover letters can be written in these languages (one button each).
 cover_letter_languages: [English]
 
-# Where CVs are saved on the Mac (relative to the project folder).
+# Where CVs are saved on your computer (relative to the project folder).
 cv_root: CVs
 
 # The kinds of roles you look for (folder names for CVs, and the company scout's target roles).

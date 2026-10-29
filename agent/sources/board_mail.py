@@ -5,7 +5,7 @@ the emails.
 Which boards: settings.yaml email_alerts.boards, each a name and the sender address (or just
 its domain) the alerts come from, e.g. {name: Indeed, sender: alert@indeed.com}.
 
-Each email is read by Claude (on the Mac; in the cloud those emails wait for the Mac), which
+Each email is read by Claude (on the computer; in the cloud those emails wait for the computer), which
 lists every job's title, company, place and text. Like the LinkedIn alerts:
   1. a job that is also on the company's own careers board (one we know, or a public
      Greenhouse / Lever / Ashby board found now) is taken from there;
@@ -161,7 +161,7 @@ def on_mac() -> bool:
 
 
 def parse(board: str, msg: dict):
-    """The jobs in one email, or None when it must wait for the Mac (Claude is needed)."""
+    """The jobs in one email, or None when it must wait for the computer (Claude is needed)."""
     if not on_mac():
         return None
     return parse_with_claude(board, msg)
@@ -176,7 +176,7 @@ def to_job(b: BoardJob, msg_id: str, received_ms: int) -> Job:
 
 
 def save_post(job: Job) -> None:
-    """The job's text, for its CV (read by tasks._job_from_sheet; the Mac only, where CVs are built).
+    """The job's text, for its CV (read by tasks._job_from_sheet; the computer only, where CVs are built).
     In the cloud the email is read again from Gmail instead."""
     if on_mac():
         POSTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -199,7 +199,7 @@ def collect(sheet: Sheet, fetched: list, known_companies: list, log=print) -> li
                 continue
             read += 1
             jobs = [] if ACCOUNT_MAIL.search(m.get("subject", "")) else parse(board, m)
-            if jobs is None:                             # needs Claude: the Mac reads it later
+            if jobs is None:                             # needs Claude: the computer reads it later
                 waiting = len(ids) - i
                 break
             newest = max(newest, m["received_ms"] // 1000)
@@ -217,7 +217,7 @@ def collect(sheet: Sheet, fetched: list, known_companies: list, log=print) -> li
         if read:
             log(f"{board}: {read} emails, {len(items)} jobs, "
                 f"{sum(1 for j in out if j.source == board)} not on a company board"
-                + (f", {waiting} waiting for the Mac" if waiting else ""))
+                + (f", {waiting} waiting for the computer" if waiting else ""))
     return out
 
 

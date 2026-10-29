@@ -1,5 +1,5 @@
-"""Secrets: the macOS Keychain on the Mac (service "job-hunt-agent"), environment variables in
-GitHub Actions.
+"""Secrets: your system's keychain (service "job-hunt-agent": the macOS Keychain, Windows
+Credential Manager or the Linux Secret Service), environment variables in GitHub Actions.
 
 Values are returned to the caller only; nothing here logs or prints them.
 """
@@ -28,7 +28,7 @@ def get(name: str, required: bool = True) -> str:
 
 
 def set_local(name: str, value: str) -> None:
-    """Update a Keychain value (Mac only)."""
+    """Update a keychain value (on the computer only)."""
     import keyring
     keyring.set_password(SERVICE, name, value)
     get.cache_clear()

@@ -7,7 +7,7 @@
 *.pdf
 !examples/*.pdf
 
-# Keys and tokens (they live in the macOS Keychain, never in files)
+# Keys and tokens (they live in your system's keychain, never in files)
 .env
 *.pem
 *credentials*.json

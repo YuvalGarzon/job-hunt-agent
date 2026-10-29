@@ -62,3 +62,4 @@ urllib3==2.8.0
 weasyprint==70.0
 webencodings==0.6.1
 zopfli==0.4.3
+tzdata>=2024.1; sys_platform == "win32"    # time zones on Windows

@@ -1,5 +1,5 @@
 """A job the user hands the bot: a post forwarded from a Telegram group, /job <link>, a
-bare link, or a screenshot / photo / PDF / Word file of a job post. Runs on the Mac (Claude reads
+bare link, or a screenshot / photo / PDF / Word file of a job post. Runs on your computer (Claude reads
 posts that have no usable link, and the text in images).
 
 0. Photos and files: their text is read first (images and scanned PDFs by Claude, PDF and Word
@@ -144,13 +144,14 @@ def read_media(items: list, key: str) -> str:
             if mime == "image/heic":                       # iPhone photos: Claude reads PNG/JPEG
                 src, f = folder / f"src_{n}.heic", folder / f"image_{n}.png"
                 src.write_bytes(data)
-                subprocess.run(["sips", "-s", "format", "png", str(src), "--out", str(f)], capture_output=True,
-                               timeout=60)
+                if shutil.which("sips"):                   # macOS converts them; elsewhere they are skipped
+                    subprocess.run(["sips", "-s", "format", "png", str(src), "--out", str(f)], capture_output=True,
+                                   timeout=60)
                 src.unlink()
                 if f.exists():
                     images.append(f)
                 else:
-                    parts.append(f"[{it['name']}: could not open this HEIC photo]")
+                    parts.append(f"[{it['name']}: could not open this HEIC photo; send it as a screenshot or JPEG]")
             elif mime in IMAGE_TYPES:
                 f = folder / f"image_{n}{IMAGE_TYPES[mime]}"
                 f.write_bytes(data)

@@ -1,4 +1,4 @@
-"""Headless Claude Code calls (`claude -p`) for the Mac worker.
+"""Headless Claude Code calls (`claude -p`) for the worker on your computer.
 
 Always passes an explicit model and effort from settings.yaml. Refuses Fable models and
 "best". A plan, credits or usage-limit error is raised as PlanLimitError and is never
@@ -6,6 +6,7 @@ retried on another model.
 """
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -38,7 +39,7 @@ COUNT_FILE = config.STATE_DIR / "claude_calls.json"
 
 
 def _count() -> None:
-    """Calls per day (Mac only), shown in /status so wasted calls are noticed."""
+    """Calls per day (on the computer only), shown in /status so wasted calls are noticed."""
     from datetime import date
     try:
         data = json.loads(COUNT_FILE.read_text()) if COUNT_FILE.exists() else {}
@@ -67,7 +68,7 @@ def ask(prompt: str, system: str = None, allow_web: bool = False, timeout: int =
     cwd.mkdir(parents=True, exist_ok=True)
     blocked = [t for t in NO_TOOLS if not (allow_web and t in ("WebFetch", "WebSearch"))
                and not (files_dir and t == "Read")]
-    cmd = ["claude", "-p", "--model", model, "--effort", effort, "--output-format", "json",
+    cmd = [shutil.which("claude") or "claude", "-p", "--model", model, "--effort", effort, "--output-format", "json",
            "--no-session-persistence", "--strict-mcp-config", "--disallowedTools", *blocked]
     if allow_web:
         cmd += ["--allowedTools", "WebSearch", "WebFetch"]

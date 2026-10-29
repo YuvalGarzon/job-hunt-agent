@@ -1,14 +1,14 @@
 """Gmail sign-in (once, and again weekly while the OAuth app is in Testing).
 
-Usage (in the Terminal app, from the project folder):
-    .venv/bin/python scripts/gmail_auth.py
-    .venv/bin/python scripts/gmail_auth.py --production   # after publishing the app: no 7-day expiry
-    .venv/bin/python scripts/gmail_auth.py --github       # also copy the values to GitHub Secrets (cloud mode)
+Usage (in a terminal, from the project folder, with .venv active):
+    python scripts/gmail_auth.py
+    python scripts/gmail_auth.py --production   # after publishing the app: no 7-day expiry
+    python scripts/gmail_auth.py --github       # also copy the values to GitHub Secrets (cloud mode)
 
 1. If a downloaded OAuth client file (client_secret_*.json) is in ~/Downloads, moves its
-   client id and secret into the Keychain and deletes the file.
+   client id and secret into the system keychain and deletes the file.
 2. Opens the browser so you sign in yourself, with only gmail.readonly and gmail.send.
-3. Stores the refresh token in the Keychain (and, with --github, in your repo's GitHub Secrets).
+3. Stores the refresh token in the system keychain (and, with --github, in your repo's GitHub Secrets).
 Nothing secret is printed or written to disk.
 """
 import json
@@ -47,7 +47,7 @@ def import_client_file() -> None:
     for p, _ in found:
         p.unlink()
         print(f"deleted {p.name}")
-    print("saved GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in the Keychain")
+    print("saved GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in the system keychain")
 
 
 def repo() -> str:
@@ -97,7 +97,7 @@ def main() -> None:
     issued = "production" if "--production" in sys.argv else datetime.now(timezone.utc).isoformat(timespec="seconds")
     keyring.set_password(SERVICE, "GMAIL_REFRESH_TOKEN", creds.refresh_token)
     keyring.set_password(SERVICE, "GMAIL_TOKEN_ISSUED", issued)
-    print("saved GMAIL_REFRESH_TOKEN in the Keychain")
+    print("saved GMAIL_REFRESH_TOKEN in the system keychain")
     if "--github" in sys.argv:
         target = repo()
         if not target:

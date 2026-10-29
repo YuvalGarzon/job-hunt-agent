@@ -1,10 +1,10 @@
-"""Move a Google service-account key from ~/Downloads into the Keychain, then delete the file.
+"""Move a Google service-account key from ~/Downloads into the system keychain, then delete the file.
 
-Usage (in the Terminal app, from the project folder):
-    .venv/bin/python scripts/import_sa_key.py [path/to/key.json]
+Usage (in a terminal, from the project folder, with .venv active):
+    python scripts/import_sa_key.py [path/to/key.json]
 
 Without a path it takes the newest service-account key (*.json) in ~/Downloads, stores its
-content in the Keychain as GOOGLE_SA_JSON (service "job-hunt-agent"), and deletes the file
+content in the system keychain as GOOGLE_SA_JSON (service "job-hunt-agent"), and deletes the file
 directly (not to the Trash). The key content is never printed.
 """
 import json
@@ -39,7 +39,7 @@ def import_key(path: Path, data: dict) -> str:
         sys.exit("Keychain write could not be verified; the file was NOT deleted")
     path.unlink()
     print(f"deleted {path.name}")
-    print(f"saved GOOGLE_SA_JSON in the Keychain (key id ends ...{data['private_key_id'][-4:]})")
+    print(f"saved GOOGLE_SA_JSON in the system keychain (key id ends ...{data['private_key_id'][-4:]})")
     return data["client_email"]
 
 

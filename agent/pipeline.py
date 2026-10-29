@@ -1,4 +1,4 @@
-"""Find jobs and alert them in one batch (runs in the cloud; can also run on the Mac).
+"""Find jobs and alert them in one batch (runs in the cloud; can also run on the computer).
 
 Every job in the user's country (or of unknown location) is recorded once in the Jobs tab with
 its decision and reason; that tab is the dedup. Jobs clearly outside the country are only counted.

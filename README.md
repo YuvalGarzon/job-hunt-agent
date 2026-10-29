@@ -1,6 +1,6 @@
 # Job Hunt Agent
 
-A personal job-search agent that runs on your Mac. It watches company career pages and your
+A personal job-search agent that runs on your own computer (macOS, Windows or Linux). It watches company career pages and your
 job-alert emails, sends you the jobs that fit you on Telegram, and builds a one-page CV
 tailored to each job you approve: written only from facts you gave it, checked by code
 before you ever see it.
@@ -43,17 +43,17 @@ send email to you.
                           job type, scams)
 ```
 
-- **Your Mac** runs a background worker (it starts at login): it answers Telegram, runs Claude
+- **Your computer** runs a background worker (it starts when you log in): it answers Telegram, runs Claude
   Code for the writing, renders the CVs, and searches.
 - **Claude Code** (headless, on your own plan) does the writing and reading: CVs, letters,
   answers, reading job-alert emails and screenshots. Code checks everything it writes.
 - **A Google Sheet** is the agent's memory and your application tracker.
-- **Your files stay on your Mac.** Your profile and settings are never committed, and your
-  keys live in the macOS Keychain.
+- **Your files stay on your computer.** Your profile and settings are never committed, and your
+  keys live in your system's keychain.
 
 ## What you need
 
-- A Mac with Python 3.11 or newer
+- A computer with **macOS, Windows or Linux** and [Python](https://www.python.org/downloads/) 3.11 or newer
 - [Claude Code](https://claude.com/claude-code) installed and signed in (a Claude plan that includes it)
 - A Telegram account
 - A Google account (for the Sheet and Gmail; a free Google Cloud project, no billing needed)
@@ -64,22 +64,48 @@ send email to you.
 
 ### 1. Get the code
 
+**macOS / Linux** (in Terminal):
+
 ```bash
 git clone https://github.com/YuvalGarzon/job-hunt-agent.git
 cd job-hunt-agent
 python3 -m venv .venv
-.venv/bin/pip install -r requirements-mac.txt
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+**Windows** (in PowerShell):
+
+```powershell
+git clone https://github.com/YuvalGarzon/job-hunt-agent.git
+cd job-hunt-agent
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+The CVs are made into PDFs with [WeasyPrint](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html),
+which needs one system library besides Python:
+
+- **macOS:** nothing more (if a PDF fails, `brew install pango`).
+- **Linux:** the Pango library, e.g. `sudo apt install libpango-1.0-0 libpangoft2-1.0-0` on Ubuntu/Debian.
+- **Windows:** install GTK as the [WeasyPrint Windows guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#windows) explains.
+
+On Linux, the keys are kept by your desktop's keyring (GNOME Keyring or KWallet), so use a
+desktop session, not a bare server.
+
+Every command below is run in the project folder with the environment active
+(`source .venv/bin/activate` on macOS / Linux, `.venv\Scripts\Activate.ps1` on Windows).
 
 ### 2. Run the setup wizard
 
 ```bash
-.venv/bin/python setup.py
+python setup.py
 ```
 
 It goes step by step and asks before each one. You can stop at any time (Ctrl+C) and run it
 again: finished steps are marked ✓, and you can redo any single step later, e.g.
-`.venv/bin/python setup.py search`.
+`python setup.py search`.
 
 | Step | What it asks or does |
 |---|---|
@@ -93,7 +119,7 @@ again: finished steps are marked ✓, and you can redo any single step later, e.
 | **8. Companies** | Shows the starter list of large companies (remove any you don't want), lets you add the companies you want by pasting their careers page link or name, and asks Claude to find more tech companies near you. |
 | **9. Your general CV** | Builds your general CV from your profile, the one every tailored CV starts from, and opens it. |
 | **10. A first search** | Searches right away, so the first job cards arrive on Telegram. |
-| **11. Background worker** | Installs the worker so the agent runs whenever your Mac is awake. |
+| **11. Background worker** | Installs the worker so the agent runs whenever your computer is awake: a launchd agent on macOS, a systemd user service on Linux, a Task Scheduler task on Windows. |
 
 ### Connecting everything (what the wizard walks you through)
 
@@ -101,7 +127,7 @@ again: finished steps are marked ✓, and you can redo any single step later, e.
 <summary><b>Claude Code</b></summary>
 
 Install Claude Code from [claude.com/claude-code](https://claude.com/claude-code), then run
-`claude` once in the Terminal and sign in. The agent calls it headlessly (`claude -p`) with
+`claude` once in a terminal and sign in. The agent calls it headlessly (`claude -p`) with
 the model and effort in `settings.yaml` (`worker:`), on your own plan. If your plan hits a
 usage limit, the agent stops and tells you on Telegram; it never switches to another model.
 </details>
@@ -123,7 +149,7 @@ The bot answers only your own chat; messages from anyone else are ignored.
 2. Enable the [Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com).
 3. **IAM & Admin › Service Accounts › Create service account** (any name, no roles needed).
 4. Open it › **Keys › Add key › Create new key › JSON**. It downloads to `~/Downloads`; the
-   wizard moves it into the Keychain and deletes the file.
+   wizard moves it into your system's keychain and deletes the file.
 5. Create a new Google Sheet ([sheets.new](https://sheets.new)), click **Share**, and add the
    service account's email (the wizard shows it) as **Editor**.
 6. Paste the Sheet's URL into the wizard.
@@ -147,7 +173,7 @@ In the same Google Cloud project:
 The agent reads your mail only to find job alerts and replies from companies you applied to,
 and it can only send email to your own address. While the OAuth app is in *Testing*, Google
 ends the sign-in after 7 days; the agent reminds you on Telegram to run
-`.venv/bin/python scripts/gmail_auth.py` again. To stop that, publish the app (**OAuth consent
+`python scripts/gmail_auth.py` again. To stop that, publish the app (**OAuth consent
 screen › Publish app**) and sign in once with `scripts/gmail_auth.py --production`.
 </details>
 
@@ -223,7 +249,8 @@ committed. Edit them any time; the agent reads them on its next run.
 | `companies.yaml` | The companies whose job boards are read every run (`/company` and the scout add more in the Sheet's Boards tab). | [`examples/companies.example.yaml`](examples/companies.example.yaml) |
 | `base_cv.yaml` | Your general CV, the starting point of every tailored CV. | [`examples/base_cv.example.yaml`](examples/base_cv.example.yaml) |
 
-Keys and tokens (Telegram, Google, Gmail) are stored in the macOS Keychain under
+Keys and tokens (Telegram, Google, Gmail) are stored in your system's keychain (macOS Keychain,
+Windows Credential Manager or the Linux Secret Service) under
 `job-hunt-agent`, never in a file. Logs are in `~/.job-hunt-agent/logs/`.
 
 ### How the CV stays true
@@ -240,12 +267,12 @@ and is never sent:
 
 ## Optional: cloud mode
 
-The Mac worker is the main way to run the agent. If you want the search to go on while your
-Mac sleeps, a GitHub Actions workflow (`.github/workflows/job-hunt-agent.yml`) can run the
-search and answer Telegram in the cloud (CV building waits for the Mac).
+The worker on your computer is the main way to run the agent. If you want the search to go on
+while your computer sleeps, a GitHub Actions workflow (`.github/workflows/job-hunt-agent.yml`)
+can run the search and answer Telegram in the cloud (CV building waits for your computer).
 
 1. Use a **private** copy of this repo: Actions logs of a public repo are public.
-2. Copy your keys and files to its GitHub Secrets: `.venv/bin/python scripts/push_secret.py --all`
+2. Copy your keys and files to its GitHub Secrets: `python scripts/push_secret.py --all`
    (needs the [GitHub CLI](https://cli.github.com/), signed in).
 3. In the workflow file, remove the `#` in front of the `schedule:` lines and push.
 
@@ -253,15 +280,19 @@ GitHub's free plan includes 2,000 Actions minutes a month; the agent warns you o
 
 ## Troubleshooting
 
-- **No jobs arrive:** send `/status` (is the Mac online, the search paused?) and `/sources`
+- **No jobs arrive:** send `/status` (is your computer online, the search paused?) and `/sources`
   (errors from boards). Try a lower `/threshold`. Check `~/.job-hunt-agent/logs/worker.log`.
-- **"Gmail access expired":** run `.venv/bin/python scripts/gmail_auth.py`.
+- **"Gmail access expired":** run `python scripts/gmail_auth.py`.
 - **A CV keeps failing:** the message names the check that failed; usually a fact is missing
   from `PROFILE.yaml`. Add it there (only if it's true) and tap 🔁 Try again.
-- **The worker:** reinstall with `scripts/install_worker.sh`, remove it with
-  `scripts/install_worker.sh --remove`.
-- **The Mac sleeps:** the agent works only while the Mac is awake. To keep it awake when
-  plugged in: System Settings › Battery › Options, or `sudo pmset -c sleep 0`.
+- **The worker:** reinstall with `python scripts/install_worker.py`, remove it with
+  `python scripts/install_worker.py --remove`. You can also run it in the open with
+  `python -m agent.worker` to watch what it does.
+- **The computer sleeps:** the agent works only while the computer is awake. To keep it awake
+  when plugged in: on macOS System Settings › Battery › Options (or `sudo pmset -c sleep 0`); on
+  Windows Settings › System › Power & battery › Screen and sleep; on Linux your desktop's
+  Power settings.
+- **HEIC photos** (iPhone) of a job post are read on macOS only; elsewhere send a screenshot.
 
 ## Project structure
 
@@ -276,9 +307,9 @@ agent/                the agent
   cv_builder.py truth_check.py            tailored CVs and their checks
   bot.py alerts.py intake.py writing.py answers.py tracking.py scout.py company_add.py
 cv_template/          the CV design (HTML, rendered to PDF) and the link check
-scripts/              Keychain, Gmail sign-in, Sheet format, worker install, GitHub Secrets
+scripts/              keychain, Gmail sign-in, Sheet format, worker install, GitHub Secrets
 examples/             a made-up person's profile, settings, companies and CV
-tests/                the tests (run as the made-up person): .venv/bin/python -m pytest
+tests/                the tests (run as the made-up person): python -m pytest
 ```
 
 ## Rules the agent follows

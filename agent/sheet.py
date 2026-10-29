@@ -1,4 +1,4 @@
-"""The Google Sheet: the single source of truth for state, shared by the cloud and the Mac.
+"""The Google Sheet: the single source of truth for state, shared by the cloud and the computer.
 
 Access: a service account with scope spreadsheets only, opening one Sheet by ID. Rows are
 never deleted, so row numbers stay stable and both halves can update by row.

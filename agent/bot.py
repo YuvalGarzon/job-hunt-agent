@@ -207,7 +207,7 @@ def on_approve(sheet: Sheet, job_id: str, msg_id, ctx, confirmed: bool = False) 
             tg.send_message(f"✅ Approved: <b>{tg.esc(job['Title'])}</b> · {tg.esc(job['Company'])}\nBuilding a tailored CV…")
         else:
             tg.send_message(f"✅ Approved: <b>{tg.esc(job['Title'])}</b> · {tg.esc(job['Company'])}\n"
-                            "⏳ Queued: the CV will come when the Mac is back.")
+                            "⏳ Queued: the CV will come when your computer is back online.")
     if msg_id:
         tg.edit_buttons(msg_id, [[("✅ Approved", "noop:")]])
 
@@ -385,7 +385,7 @@ def on_retry(sheet: Sheet, app_id: str, msg_id, ctx) -> None:
         return
     queue_task(sheet, "build_cv", app["Job ID"], app_id, {"mode": "retry"}, _next_cv_task_id(sheet, app_id))
     sheet.flush()
-    tg.send_message("🔁 Building a new version…" if ctx["mac_online"] else "🔁 Queued: the new version will come when the Mac is back.")
+    tg.send_message("🔁 Building a new version…" if ctx["mac_online"] else "🔁 Queued: the new version will come when your computer is back online.")
 
 
 def on_fix(sheet: Sheet, app_id: str, msg_id, ctx) -> None:
@@ -416,7 +416,7 @@ def _cl_task(sheet: Sheet, app_id: str, payload: dict, ctx, note: str) -> None:
         return
     queue_task(sheet, "cover_letter", app["Job ID"], app_id, payload, f"cl-{app_id}-{ctx.get('update_id') or now_iso()}")
     sheet.flush()
-    tg.send_message(note if ctx["mac_online"] else "📝 Queued: the letter will come when the Mac is back.")
+    tg.send_message(note if ctx["mac_online"] else "📝 Queued: the letter will come when your computer is back online.")
 
 
 def on_cl_write(sheet: Sheet, arg: str, msg_id, ctx) -> None:
@@ -555,7 +555,7 @@ def on_followup(sheet: Sheet, app_id: str, msg_id, ctx) -> None:
     elif queue_task(sheet, "followup_draft", app["Job ID"], app_id, {}, f"fu-{app_id}-{ctx.get('update_id') or now_iso()}"):
         sheet.flush()
         tg.send_message(("✍️ Writing a new draft…" if mine else "✍️ Writing a draft…") if ctx["mac_online"]
-                        else "✍️ The draft will come when the Mac is back.")
+                        else "✍️ The draft will come when your computer is back online.")
     if msg_id:
         tg.edit_buttons(msg_id, [])
 
@@ -709,7 +709,7 @@ def on_text(sheet: Sheet, text: str, ctx) -> None:
                        _next_cv_task_id(sheet, app_id))
             sheet.flush()
             tg.send_message("✏️ Got it. Building a fixed version…" if ctx["mac_online"]
-                            else "✏️ Got it. The fix is queued, and the version will come when the Mac is back.")
+                            else "✏️ Got it. The fix is queued, and the version will come when your computer is back online.")
             return
         sheet.flush()
     queue_task(sheet, "chat", "", "", {"text": text[:4000], "job_id": ctx.get("job_id", ""),
@@ -717,7 +717,7 @@ def on_text(sheet: Sheet, text: str, ctx) -> None:
                f"chat-{ctx.get('update_id') or now_iso()}")
     sheet.flush()
     if not ctx["mac_online"]:
-        tg.send_message("💬 The Mac is off right now. I'll answer when it's back.")
+        tg.send_message("💬 Your computer is off right now. I'll answer when it's back.")
 
 
 def _waiting_for_job(sheet: Sheet) -> bool:
@@ -732,7 +732,7 @@ def _waiting_for_job(sheet: Sheet) -> bool:
 def on_job_post(sheet: Sheet, text: str, urls: list, update_id, ctx, media: list = None, group: str = "",
                 for_job: str = "") -> None:
     """A post forwarded from a Telegram group, a bare link, /job <link>, or a screenshot / photo /
-    file of a job post: checked on the Mac. Right after a bare /cv, the job also gets a tailored CV.
+    file of a job post: checked on your computer. Right after a bare /cv, the job also gets a tailored CV.
     Photos sent together (an album) arrive one message each and become one task."""
     if group:
         q = sheet.t("Queue")
@@ -769,11 +769,11 @@ def on_job_post(sheet: Sheet, text: str, urls: list, update_id, ctx, media: list
         job = sheet.t("Jobs").find("Job ID", for_job)
         tg.send_message(f"📝 Got the job description of <b>{tg.esc(job['Title'])}</b> · {tg.esc(job['Company'])}. "
                         + ("Saving it, updating the score and building a CV from it…" if ctx["mac_online"]
-                           else "The Mac is off, I'll handle it when it's back."))
+                           else "Your computer is off, I'll handle it when it's back."))
         return
     what = "the image" if media and media[0]["mime"].startswith("image/") else "the file" if media else ""
     tg.send_message((f"📥 Got it. Reading {what} and checking the job…" if what else "📥 Got it. Checking the job…")
-                    if ctx["mac_online"] else "📥 Got it. The Mac is off, I'll check the job when it's back.")
+                    if ctx["mac_online"] else "📥 Got it. Your computer is off, I'll check the job when it's back.")
 
 
 ANSWER_WAIT = timedelta(minutes=30)
@@ -792,7 +792,7 @@ def _waiting_for_answer(sheet: Sheet) -> str:
 def queue_answer(sheet: Sheet, payload: dict, task_id: str, ctx) -> None:
     if queue_task(sheet, "answer", payload.get("job_id", ""), "", payload, task_id):
         sheet.flush()
-        tg.send_message("📝 Writing an answer…" if ctx["mac_online"] else "📝 Queued: I'll write the answer when the Mac is back.")
+        tg.send_message("📝 Writing an answer…" if ctx["mac_online"] else "📝 Queued: I'll write the answer when your computer is back online.")
 
 
 def on_answer_input(sheet: Sheet, msg: dict, text: str, media: list, replied, ctx) -> bool:
@@ -888,13 +888,13 @@ def cmd_status(sheet, arg, ctx):
     paused = sheet.kv_get("Settings", "paused", "no") == "yes"
     last = sheet.kv_get("Health", "last_find_run", "—")
     lines = ["<b>Status</b>",
-             f"Mac: {'🟢 online' if ctx['mac_online'] else '🔴 off'}" + (f" (last heartbeat {tg.esc(hb[11:16])})" if hb else ""),
+             f"Computer: {'🟢 online' if ctx['mac_online'] else '🔴 off'}" + (f" (last heartbeat {tg.esc(hb[11:16])})" if hb else ""),
              f"Search: {'⏸ paused' if paused else '▶️ on'} · threshold: {threshold(sheet)}",
              f"Last run: {tg.esc(last)}",
              "Applications: " + (", ".join(f"{k} {v}" for k, v in by_status.items()) or "none yet"),
              f"Tasks in the queue: {len(waiting)}"]
     from agent import claude_cli
-    if claude_cli.COUNT_FILE.exists():                   # the Mac answers: it makes the Claude calls
+    if claude_cli.COUNT_FILE.exists():                   # the computer answers: it makes the Claude calls
         lines.append(f"Claude calls today: {claude_cli.calls_today()}")
     tg.send_message("\n".join(lines), buttons=[[("📧 Check mail now", "mailnow:")]])
 
@@ -965,7 +965,7 @@ def cmd_prep(sheet, arg, ctx):
         return
     queue_task(sheet, "prep", "", "", {"company": arg.strip()[:80]}, f"prep-{ctx.get('update_id') or now_iso()}")
     sheet.flush()
-    tg.send_message("📚 Preparing your interview prep…" if ctx["mac_online"] else "📚 Queued: the prep will come when the Mac is back.")
+    tg.send_message("📚 Preparing your interview prep…" if ctx["mac_online"] else "📚 Queued: the prep will come when your computer is back online.")
 
 
 def cmd_cv(sheet, arg, ctx):
@@ -980,7 +980,7 @@ def cmd_cv(sheet, arg, ctx):
                f"intake-{ctx.get('update_id') or now_iso()}")
     sheet.flush()
     tg.send_message("📥 Got it. Checking the job and building a CV…" if ctx["mac_online"]
-                    else "📥 Queued: I'll handle it when the Mac is back.")
+                    else "📥 Queued: I'll handle it when your computer is back online.")
 
 
 def cmd_mail(sheet, arg, ctx):
@@ -992,7 +992,7 @@ def cmd_mail(sheet, arg, ctx):
     queue_task(sheet, "mail_now", "", "", {}, f"mailnow-{stamp}")
     sheet.flush()
     tg.send_message("📧 Checking your email now: company replies and job alerts…" if ctx["mac_online"]
-                    else "📧 The Mac is off. I'll check your email when it's back.")
+                    else "📧 Your computer is off. I'll check your email when it's back.")
 
 
 def cmd_company(sheet, arg, ctx):

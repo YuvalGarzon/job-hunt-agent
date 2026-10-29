@@ -1,16 +1,18 @@
 """Set up your job-hunt agent, step by step.
 
-    .venv/bin/python setup.py            # the full setup, or pick one step to redo
-    .venv/bin/python setup.py <step>     # one step: about, cv, search, telegram, sheet, gmail,
-                                         # alerts, companies, basecv, test, worker
+    python setup.py            # the full setup, or pick one step to redo
+    python setup.py <step>     # one step: about, cv, search, telegram, sheet, gmail,
+                               # alerts, companies, basecv, test, worker
+(Run it with the project's Python: activate .venv first, see the README.)
 
 It asks about you and the jobs you want, reads your CV to draft your profile, and walks you
 through connecting Claude Code, Telegram, a Google Sheet and Gmail. Everything personal stays
-on this Mac: your answers in PROFILE.yaml and settings.yaml (never committed), keys in the
-macOS Keychain.
+on this computer: your answers in PROFILE.yaml and settings.yaml (never committed), keys in
+your system's keychain (macOS Keychain, Windows Credential Manager or the Linux Secret Service).
 """
 import getpass
 import json
+import os
 import platform
 import re
 import shutil
@@ -77,10 +79,28 @@ def wait(text: str = "Press Enter when it's done") -> None:
     input(f"{DIM}{text}…{END}")
 
 
+def open_file(path: Path, text: bool = False) -> None:
+    """Open a file with the system's own app (a text editor for text=True)."""
+    system = platform.system()
+    if system == "Darwin":
+        subprocess.run(["open", "-t", str(path)] if text else ["open", str(path)])
+    elif system == "Windows":
+        if text:
+            subprocess.Popen(["notepad", str(path)])
+        else:
+            os.startfile(str(path))                              # noqa: the Windows-only call
+    else:
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+        if text and editor:
+            subprocess.run([editor, str(path)])
+        else:
+            subprocess.run(["xdg-open", str(path)])
+
+
 def edit(path: Path) -> None:
-    """Open a file in the Mac's text editor and wait until the user is done."""
-    subprocess.run(["open", "-t", str(path)])
-    wait(f"Opened {path.name}. Save your changes, then press Enter")
+    """Open a file in a text editor and wait until the user is done."""
+    open_file(path, text=True)
+    wait(f"Opened {path} in your text editor. Save your changes, then press Enter")
 
 
 # --- files -------------------------------------------------------------------------------
@@ -114,6 +134,7 @@ def settings_country() -> str:
 
 
 def system_timezone() -> str:
+    """This computer's time zone name (macOS and Linux); UTC when it can't be read (Windows)."""
     try:
         target = Path("/etc/localtime").resolve()
         return str(target).split("zoneinfo/", 1)[1]
@@ -133,11 +154,13 @@ def store(name: str, value: str) -> None:
 
 # --- steps -------------------------------------------------------------------------------
 def step_check() -> bool:
-    title("Checking your Mac")
+    title("Checking your computer")
     good = True
-    if platform.system() != "Darwin":
-        warn("This agent is built for macOS (Keychain, launchd). Other systems are not supported.")
+    if platform.system() not in ("Darwin", "Linux", "Windows"):
+        warn(f"{platform.system()} is not supported: the agent runs on macOS, Windows and Linux.")
         good = False
+    else:
+        ok({"Darwin": "macOS", "Linux": "Linux", "Windows": "Windows"}[platform.system()])
     if sys.version_info < (3, 11):
         warn(f"Python 3.11 or newer is needed (this is {platform.python_version()}).")
         good = False
@@ -194,7 +217,8 @@ def step_about() -> None:
 
     s["location"] = {"country": land.alpha_2, "radius_km": int(float(radius or 50)), "home": [round(point[0], 4),
                                                                                              round(point[1], 4)]}
-    s["timezone"] = ask("Your time zone", s.get("timezone") if config.SETTINGS_PATH.exists() else system_timezone())
+    s["timezone"] = ask("Your time zone (like Europe/London or America/New_York)",
+                        s.get("timezone") if config.SETTINGS_PATH.exists() else system_timezone())
     save_settings(s)
 
     contact = {k: v for k, v in (("location", shown), ("phone", phone), ("email", email), ("linkedin", linkedin),
@@ -581,7 +605,7 @@ def step_basecv() -> None:
     shutil.copy(res["content"], config.BASE_CONTENT)
     ok(f"Saved {res['pdf']}")
     ok("base_cv.yaml saved: every tailored CV starts from it")
-    subprocess.run(["open", str(res["pdf"])])
+    open_file(res["pdf"])
 
 
 def step_test() -> None:
@@ -597,17 +621,20 @@ def step_test() -> None:
 
 def step_worker() -> None:
     title("11. Run in the background")
-    say("The worker runs while your Mac is awake: it answers Telegram, builds CVs and searches")
-    say("every 15 minutes. It starts by itself at login.")
+    say("The worker runs while your computer is awake: it answers Telegram, builds CVs and searches")
+    say("every 15 minutes. It starts by itself when you log in.")
     if not yes("Install the background worker now?"):
         return
-    r = subprocess.run(["/bin/zsh", str(ROOT / "scripts" / "install_worker.sh")], cwd=ROOT)
-    if r.returncode == 0:
-        ok("Installed. Logs: ~/.job-hunt-agent/logs/worker.log")
-        say(f"{DIM}Tip: to keep searching while the lid is open, prevent automatic sleep when plugged in")
-        say(f"(System Settings › Battery › Options), or run: sudo pmset -c sleep 0{END}")
-    else:
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "install_worker.py")], cwd=ROOT)
+    if r.returncode != 0:
         warn("The installer failed; see the message above.")
+        return
+    ok("Installed. Logs: ~/.job-hunt-agent/logs/worker.log")
+    tip = {"Darwin": "System Settings › Battery › Options (or run: sudo pmset -c sleep 0)",
+           "Windows": "Settings › System › Power & battery › Screen and sleep: 'Never' when plugged in",
+           "Linux": "your desktop's Power settings (automatic suspend: off when plugged in)"}
+    say(f"{DIM}Tip: the agent works only while the computer is awake. To keep it awake when plugged in:")
+    say(f"{tip.get(platform.system(), 'your power settings')}{END}")
 
 
 STEPS = [("about", "About you", step_about), ("cv", "Your profile, from your CV", step_cv),
@@ -625,7 +652,13 @@ def done(key: str) -> bool:
             "sheet": bool(keychain("SHEET_ID")), "gmail": bool(keychain("GMAIL_REFRESH_TOKEN")),
             "alerts": "email_alerts" in s, "companies": config.COMPANIES_PATH.exists(),
             "basecv": config.BASE_CONTENT.exists(),
-            "worker": (Path.home() / "Library/LaunchAgents/com.job-hunt-agent.worker.plist").exists()}.get(key, False)
+            "worker": worker_installed()}.get(key, False)
+
+
+def worker_installed() -> bool:
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import install_worker
+    return install_worker.installed()
 
 
 def main() -> None:

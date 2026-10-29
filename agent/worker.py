@@ -1,14 +1,13 @@
-"""The Mac worker: primary Telegram consumer, heartbeat, and the task queue.
+"""The worker on your computer: primary Telegram consumer, heartbeat, and the task queue.
 
-    .venv/bin/python -m agent.worker
+    python -m agent.worker       (scripts/install_worker.py runs it in the background)
 
 Four threads: one long-polls Telegram, writes every update to the Inbox and handles it;
 one writes the heartbeat every minute; one runs queue tasks (CV builds) one at a time; one runs
 the search (agent.run) whenever it is due: every 15 min by day, every 2 h at night, at once
-after the Mac wakes. The optional cloud run skips its search when this one searched recently.
+after the computer wakes. The optional cloud run skips its search when this one searched recently.
 Only one worker runs at a time (file lock).
 """
-import fcntl
 import logging
 import logging.handlers
 import sys
@@ -68,7 +67,7 @@ def poll_loop(log) -> None:
                 sheet.load("Inbox")
                 bot.record(sheet, updates, by="mac")
                 offset = max(u["update_id"] for u in updates) + 1
-            # unhandled updates: new ones, or ones the cloud recorded while the Mac was away
+            # unhandled updates: new ones, or ones the cloud recorded while the computer was away
             if updates or time.time() - last_inbox_check > INBOX_RECHECK:
                 if not updates:
                     sheet.load("Inbox")
@@ -115,12 +114,28 @@ def find_loop(log) -> None:
         _stop.wait(60)
 
 
+def take_lock(f) -> bool:
+    """An exclusive lock on the open file, without waiting (macOS / Linux, and Windows)."""
+    try:
+        import fcntl
+    except ImportError:                                 # Windows
+        import msvcrt
+        try:
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+
+
 def main() -> None:
     config.STATE_DIR.mkdir(parents=True, exist_ok=True)
     lock = open(config.STATE_DIR / "worker.lock", "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
+    if not take_lock(lock):
         print("another worker is already running")
         return
     log = _logger()

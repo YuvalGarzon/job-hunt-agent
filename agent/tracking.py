@@ -1,13 +1,13 @@
 """Tracking (step 6): company replies from Gmail, follow-up reminders, the 09:00 open jobs, the
-18:00 digest and the 22:00 email. The steps run inside the normal runs (cloud or Mac), never as extra runs.
+18:00 digest and the 22:00 email. The steps run inside the normal runs (cloud or computer), never as extra runs.
 
-- mail_scan (about hourly, cloud or Mac): new emails whose sender or text names a company
+- mail_scan (about hourly, cloud or computer): new emails whose sender or text names a company
   the user applied to through the agent become one `mail_event` task each (job-alert senders
   are skipped). Emails about applications the agent did not handle are left alone.
-- mail_event (Mac, Claude): classifies the email, adds an Events row, updates the
+- mail_event (computer, Claude): classifies the email, adds an Events row, updates the
   Application's Status, and tells the user on Telegram.
 - follow-ups: 7 days after Applied with no reply, one reminder with a "draft" button; the
-  draft (Mac, Claude) is for the user to send.
+  draft (computer, Claude) is for the user to send.
 - 18:00 digest on Telegram and the 22:00 email to the user's own address, once a day each.
 """
 import json
@@ -101,7 +101,7 @@ def mail_scan(sheet: Sheet, log=print, force: bool = False) -> int:
     return queued
 
 
-# --- 2. one company email (Mac) ----------------------------------------------------------
+# --- 2. one company email (computer) ----------------------------------------------------------
 CLASSIFY = """An email arrived about a job application to {company} for the role "{role}".
 Classify it and summarize it. Answer with JSON only:
 {{"type": "acknowledgment|assessment|interview|rejection|offer|other",

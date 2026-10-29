@@ -1,7 +1,7 @@
 """Company scout: every day, look for more companies to watch (startups, scale-ups, offices of
 large companies) near the user.
 
-Once a day from 11:00 (Mac, Claude with web search) Claude suggests tech companies near the
+Once a day from 11:00 (computer, Claude with web search) Claude suggests tech companies near the
 user's home city that are not watched yet, a different sector mix each day. Each suggestion is
 checked against the company's public job board API (Greenhouse, Lever, Ashby, Comeet); job-board
 sites and LinkedIn are never opened (rule 4).
@@ -52,7 +52,7 @@ Return up to {n} companies as JSON only:
 
 
 def maybe_queue(sheet: Sheet) -> bool:
-    """Called by the Mac worker's search loop: one scout task a day from 11:00."""
+    """Called by the worker's search loop: one scout task a day from 11:00."""
     from agent.bot import queue_task
     now = datetime.now(TZ)
     today = now.strftime("%Y-%m-%d")
@@ -205,7 +205,7 @@ def general_cv(sheet: Sheet, key: str, ctx: dict) -> None:
                f"intake-co-{key[:30]}-{now_iso()[:10]}")
     sheet.flush()
     tg.send_message(f"📄 Building a CV for <b>{tg.esc(row['Company'])}</b>"
-                    + ("…" if ctx.get("mac_online") else " when the Mac is back.")
+                    + ("…" if ctx.get("mac_online") else " when your computer is back online.")
                     + "\nWhen it's ready, send it through their careers page, form or general CV address.")
 
 
