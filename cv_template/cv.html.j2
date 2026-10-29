@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ name }} CV</title>
+<style>
+  @page { size: A4; margin: 15mm 18mm 13mm 18mm; }
+  :root { --navy: #1f3864; --ink: #1a1a1a; --link: #2f5597; }
+  * { box-sizing: border-box; }
+  body { font-family: "Calibri", "Carlito", sans-serif; font-size: 10.4pt; line-height: 1.24; color: var(--ink); margin: 0; }
+  h1 { font-size: 22pt; color: var(--navy); margin: 0 0 3pt 0; font-weight: 700; }
+  .title { font-size: 12pt; margin: 0 0 3pt 0; }
+  .contact { font-size: 10pt; margin: 0 0 7pt 0; }
+  .contact a { color: var(--navy); }
+  .sep { margin: 0 5pt; }
+  h2 { font-size: 11.5pt; color: var(--navy); letter-spacing: 1.6pt; text-transform: uppercase; margin: 9pt 0 3pt 0; font-weight: 700; }
+  p { margin: 0; }
+  .skills div { margin: 0 0 2pt 0; }
+  .skills b { margin-right: 4pt; }
+  .entry { margin: 5pt 0 0 0; }
+  .entry-head { font-weight: 700; }
+  .entry-head .dates { margin-right: 4pt; }
+  .stack { margin: 1pt 0 1pt 0; }
+  .stack a, .also a { color: var(--link); text-decoration: none; }
+  a.proj { color: var(--link); text-decoration: underline; }
+  ul { margin: 1pt 0 0 0; padding-left: 15pt; }
+  li { margin: 0 0 1pt 0; padding-left: 1pt; }
+  .also { margin: 4pt 0 0 0; }
+  .also b { margin-right: 3pt; }
+  .langs { margin: 4pt 0 0 0; }
+  .langs b { margin-right: 4pt; }
+</style>
+</head>
+<body>
+  <h1>{{ name }}</h1>
+  <p class="contact">
+    {% for key, value in contact.items() %}{% if not loop.first %}<span class="sep">·</span>{% endif %}{% if key == 'email' %}<a href="mailto:{{ value }}">{{ value }}</a>{% elif key == 'linkedin' %}<a href="{{ value }}">LinkedIn</a>{% elif key == 'github' %}<a href="{{ value }}">GitHub</a>{% elif value is string and value.startswith('http') %}<a href="{{ value }}">{{ value.split('//')[-1].rstrip('/') }}</a>{% else %}{{ value }}{% endif %}{% endfor %}
+  </p>
+
+  <h2>Summary</h2>
+  {% if summary_lead %}<p><b>{{ summary_lead }}</b></p>{% endif %}
+  <p>{{ summary }}</p>
+
+  <h2>Technical Skills</h2>
+  <div class="skills">
+    {% for group in skills %}<div><b>{{ group.label }}</b>{{ group['items'] | join(', ') }}</div>{% endfor %}
+  </div>
+
+  {% if experience %}
+  <h2>Experience</h2>
+  {% for job in experience %}
+  <div class="entry">
+    <div class="entry-head"><span class="dates">{{ job.dates }}</span> {{ job.role }}<span class="sep">·</span>{{ job.org }}</div>
+    <ul>{% for b in job.bullets %}<li>{{ b }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% macro project_name(p) %}{% if p.url %}<a class="proj" href="{{ p.url }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}{% endmacro %}
+  {% if main_project %}
+  <h2>Projects</h2>
+  {% for p in [main_project, second_project] if p %}
+  <div class="entry">
+    <div class="entry-head">{{ project_name(p) }}{% if p.context and p.context in show_context %}<span class="sep">·</span>{{ p.context }}{% endif %}</div>
+    <div class="stack">{{ p.stack | join(', ') }}</div>
+    <ul>{% for b in p.bullets %}<li>{{ b }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+  {% if also_built %}
+  <div class="also"><b>Also built</b>
+    <ul>{% for p in also_built %}<li>{{ project_name(p) }}: {{ p.text }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <h2>Education</h2>
+  {% for edu in education %}
+  <div class="entry">
+    <div class="entry-head"><span class="dates">{{ edu.dates }}</span> {{ edu.degree }}{% if edu.track %}<span class="sep">·</span>{{ edu.track }}{% endif %}</div>
+    <p>{{ edu.school }}</p>
+    {% if edu.studied %}<p>Studied {{ edu.studied }}</p>{% endif %}
+  </div>
+  {% endfor %}
+  {% if languages %}<p class="langs"><b>Languages</b>{{ languages }}</p>{% endif %}
+</body>
+</html>

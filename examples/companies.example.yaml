@@ -1,0 +1,66 @@
+# companies.yaml: the companies whose public job boards are read every run.
+#
+# setup.py copies this starter list to companies.yaml and then asks Claude to find companies
+# near you (they go to the Sheet's Boards tab and are read every run too). Every source is
+# filtered to your country, so a global company only sends you its local openings.
+#
+#   ats: greenhouse | lever | comeet | ashby | workday | microsoft | amazon | google | apple
+#   board: the board ID (greenhouse/lever/ashby), or "slug/UID" for comeet
+#   tier: 1 = large global tech, 2 = large regional tech, 3 = other (a small boost in the score)
+# To add a company, find its board on its careers page:
+#   greenhouse: boards.greenhouse.io/<board> or job-boards.greenhouse.io/<board>
+#   lever:      jobs.lever.co/<board>
+#   comeet:     comeet.com/jobs/<slug>/<UID>
+#   ashby:      jobs.ashbyhq.com/<board>
+
+companies:
+  # Greenhouse
+  - {name: Stripe, ats: greenhouse, board: stripe, tier: 1}
+  - {name: Cloudflare, ats: greenhouse, board: cloudflare, tier: 1}
+  - {name: GitLab, ats: greenhouse, board: gitlab, tier: 2}
+  - {name: Databricks, ats: greenhouse, board: databricks, tier: 1}
+  - {name: Datadog, ats: greenhouse, board: datadog, tier: 1}
+  - {name: MongoDB, ats: greenhouse, board: mongodb, tier: 1}
+  - {name: Elastic, ats: greenhouse, board: elastic, tier: 1}
+  - {name: Airbnb, ats: greenhouse, board: airbnb, tier: 1}
+  - {name: Twilio, ats: greenhouse, board: twilio, tier: 2}
+  - {name: Okta, ats: greenhouse, board: okta, tier: 2}
+  - {name: Figma, ats: greenhouse, board: figma, tier: 2}
+  - {name: Pinterest, ats: greenhouse, board: pinterest, tier: 2}
+  - {name: Samsara, ats: greenhouse, board: samsara, tier: 2}
+  - {name: Grafana Labs, ats: greenhouse, board: grafanalabs, tier: 3}
+  - {name: Canonical, ats: greenhouse, board: canonical, tier: 2}
+  # Lever
+  - {name: Spotify, ats: lever, board: spotify, tier: 1}
+  - {name: Palantir, ats: lever, board: palantir, tier: 1}
+  # Ashby
+  - {name: OpenAI, ats: ashby, board: openai, tier: 1}
+  - {name: Notion, ats: ashby, board: notion, tier: 2}
+  - {name: Ramp, ats: ashby, board: ramp, tier: 3}
+
+  # Big-company career sites (agent/sources/bigco.py), filtered to your country at the source.
+  - {name: Microsoft, ats: microsoft, board: microsoft.com, tier: 1}
+  - {name: Amazon, ats: amazon, board: amazon.jobs, tier: 1}
+  - {name: Google, ats: google, board: google, tier: 1}
+  # Apple: board = the Apple jobs site locale for your country, e.g. en-us, en-gb, de-de
+  - {name: Apple, ats: apple, board: en-us, tier: 1}
+  # Workday: board = <host>/<tenant>/<site>, from the careers URL
+  # https://<host>.myworkdayjobs.com/<site>
+  - {name: NVIDIA, ats: workday, board: nvidia.wd5/nvidia/NVIDIAExternalCareerSite, tier: 1}
+  - {name: Intel, ats: workday, board: intel.wd1/intel/External, tier: 1}
+  - {name: Applied Materials, ats: workday, board: amat.wd1/amat/External, tier: 1}
+  - {name: Cisco, ats: workday, board: cisco.wd5/cisco/Cisco_Careers, tier: 1}
+  - {name: Salesforce, ats: workday, board: salesforce.wd12/salesforce/External_Career_Site, tier: 1}
+  - {name: Philips, ats: workday, board: philips.wd3/philips/jobs-and-careers, tier: 1}
+  - {name: HP, ats: workday, board: hp.wd5/hp/ExternalCareerSite, tier: 1}
+  - {name: PayPal, ats: workday, board: paypal.wd1/paypal/jobs, tier: 1}
+  - {name: Mastercard, ats: workday, board: mastercard.wd1/mastercard/CorporateCareers, tier: 1}
+  - {name: Micron, ats: workday, board: micron.wd1/micron/External, tier: 1}
+  - {name: Workday, ats: workday, board: workday.wd5/workday/Workday, tier: 1}
+
+# Large companies that get priority in ordering even when they come from other sources
+# (for example LinkedIn alerts).
+tier1_names: [Apple, NVIDIA, Google, Microsoft, Amazon, AWS, Amazon Web Services, Meta, Intel, IBM,
+  Qualcomm, Salesforce, Oracle, Cisco, Dell, HP, SAP, Broadcom, PayPal, eBay, Booking.com, Adobe,
+  ServiceNow, Stripe, Databricks, Datadog, Cloudflare, MongoDB, Spotify, OpenAI, Anthropic]
+tier2_names: []

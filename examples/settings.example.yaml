@@ -1,0 +1,56 @@
+# settings.yaml: how the agent searches. `python setup.py` writes yours from your answers;
+# this EXAMPLE is for the made-up Alex Morgan. The fit threshold also lives in the Sheet
+# (Settings tab), so /threshold <number> on Telegram changes it without editing this file.
+
+worker:
+  # Every `claude -p` call uses exactly this model and effort (your Claude Code plan).
+  model: sonnet
+  effort: medium
+
+fit_threshold_default: 50
+
+# Your local time zone (IANA name): daily messages follow it (09:00 open jobs, 18:00 digest).
+timezone: Europe/London
+
+location:
+  country: GB                 # ISO 3166 two-letter code of the country you search in
+  radius_km: 40               # how far from home a job may be
+  home: [53.4808, -2.2426]    # your home city's coordinates (setup.py finds them)
+
+search:
+  level: junior               # junior | mid | senior: which titles are too senior
+  max_years: 3                # jobs asking for more years of experience are dropped
+  # title words that get the top title score
+  preferred_titles: [machine learning, ML engineer, data scientist, data engineer, AI engineer]
+  # title words that get a good title score
+  good_titles: [software engineer, software developer, backend, python, full stack]
+  # words that make a posting about your specialty (they raise the score)
+  specialty_words: [machine learning, ML, deep learning, data science, model, models, PyTorch, statistics]
+  # words that rule a job out when they are in its title
+  exclude_title_words: [unpaid]
+  # job types you accept besides full-time: part-time, contract, internship
+  job_types: [full-time]
+  include_remote: true        # false = on-site and hybrid jobs only
+  # companies you never want jobs from, and companies you'd love to work for (they score higher)
+  avoid_companies: []
+  favorite_companies: [Spotify, Databricks]
+
+# Job-alert emails the agent reads in your Gmail (it never opens the boards' web pages).
+email_alerts:
+  linkedin: true              # LinkedIn job alerts (jobalerts-noreply@linkedin.com)
+  boards:                     # other job sites that email you alerts: a name and the sender address
+    - {name: Indeed, sender: alert@indeed.com}
+
+# Cover letters can be written in these languages (one button each).
+cover_letter_languages: [English]
+
+# Where CVs are saved on the Mac (relative to the project folder).
+cv_root: CVs
+
+# The kinds of roles you look for (folder names for CVs, and the company scout's target roles).
+role_folders:
+  - ML Engineer
+  - Data Scientist
+  - Data Engineer
+  - Software Engineer
+  - Backend Engineer

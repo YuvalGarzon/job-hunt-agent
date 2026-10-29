@@ -1,0 +1,162 @@
+# PROFILE.yaml: the single source of truth about you.
+#
+# This is an EXAMPLE for a made-up person, Alex Morgan. `python setup.py` writes your own
+# PROFILE.yaml from your CV and your answers; you can also copy this file and edit it.
+#
+# The agent may only write on a CV, cover letter or recruiter message what is in this file.
+# It may choose, order, shorten and rephrase. It may never add a fact, a number, a tool or a
+# responsibility that is not here. If a job asks for something missing from this file, the
+# agent reports it as a gap. It does not invent it. You own this file: only you change facts.
+
+identity:
+  name: Alex Morgan
+  # shown on the CV in this order; remove a line to leave it off the CV
+  contact:
+    location: United Kingdom
+    phone: "+44 7700 900123"
+    email: alex.morgan@example.com
+    linkedin: https://www.linkedin.com/in/alex-morgan-example
+    github: https://github.com/alex-morgan-example
+  availability: immediately
+  languages: English (native), Spanish (professional).
+
+# Used for filtering and judgement only. NEVER written on a CV or in a message.
+private_never_on_cv:
+  home_city: Manchester              # the search radius is measured from here
+  notes:
+    - grade average is not shown on the CV
+
+# One entry per degree, newest first.
+education:
+  - dates: "2021 – 2025"
+    degree: B.Sc. Computer Science
+    track: Data Science Track         # optional
+    school: Northfield University
+    # The CV's "Studied ..." line picks 3 to 5 of these that fit the job (optional)
+    studied_areas: [machine learning, deep learning, statistics, algorithms, databases, distributed systems]
+
+# strong = you can answer in depth in an interview. used = used in a real project.
+# A tool that is in neither list never appears anywhere.
+skills:
+  strong:
+    - Python
+    - SQL
+    - pandas
+    - NumPy
+    - scikit-learn
+    - PyTorch
+    - FastAPI
+    - PostgreSQL
+    - Git
+    - Docker
+  used:
+    - TypeScript
+    - React
+    - Java
+    - Spark
+    - AWS
+    - Linux
+    - pytest
+    - REST APIs
+    - CI/CD
+    - LLM APIs
+  # the groups on the CV, in any order the job needs
+  skill_groups_on_cv: [Languages, Machine Learning & Data, Backend & Web, Tools]
+
+# Newest first. bullets_approved is the exact wording the CV may use.
+experience:
+  - id: datalab
+    dates: "2024 – 2025"
+    role: Software Developer
+    org: Northfield University Data Lab
+    bullets_approved:
+      - Built Python data pipelines that clean and load research survey data into PostgreSQL for the lab's analysts.
+      - Developed a FastAPI service that serves the lab's trained models to an internal dashboard.
+    never_write: [Project Bluebird]   # words or phrases the agent must never write
+
+  - id: warehouse
+    dates: "2019 – 2021"
+    role: Robotics Technician
+    org: Brightline Logistics
+    org_related: Brightline Logistics, Warehouse Robotics      # used only on related jobs (optional)
+    bullets_approved:
+      - Maintained a fleet of warehouse picking robots and diagnosed sensor and drive faults.
+    # optional: the one bullet used when the job is NOT related (see cv_rules.related_job_words)
+    bullets_short:
+      - Maintained warehouse picking robots.
+    # optional: the bullets used instead on related jobs
+    bullets_related:
+      - Maintained a fleet of warehouse picking robots and diagnosed sensor and drive faults.
+      - Trained new technicians on robot safety procedures and fault reports.
+
+# Your projects. One main project per CV, a second full project, and an optional "Also built"
+# list. A project with a url gets its name linked on the CV (GitHub links must be public).
+projects:
+  - id: route_planner
+    name: Delivery Route Planner
+    context: B.Sc. Final Project
+    url: https://github.com/alex-morgan-example/route-planner
+    team: two developers
+    stack: [Python, scikit-learn, PyTorch, FastAPI, PostgreSQL, React, TypeScript, Docker, pytest]
+    facts:
+      - predicts delivery times per street segment and plans the shortest legal route for a day of deliveries
+      - gradient-boosted and PyTorch models compared on 2 years of public delivery data
+      - trained on 120,000 delivery records, tested on a held-out month
+      - route planning as a vehicle-routing problem with time windows
+      - FastAPI backend with PostgreSQL, React and TypeScript front end, Docker Compose setup
+      - tested with a pytest suite
+    good_for: [ML Engineer, Data Scientist, Backend Python, Software Engineer]
+
+  - id: review_classifier
+    name: Product Review Classifier
+    context: Machine Learning Course Project
+    url: https://github.com/alex-morgan-example/review-classifier
+    stack: [Python, PyTorch, scikit-learn, pandas, LLM APIs]
+    facts:
+      - classifies product reviews by topic and sentiment
+      - fine-tuned a small transformer with PyTorch and compared it with scikit-learn baselines
+      - used an LLM API to label a first batch of training data, then checked the labels by hand
+    good_for: [ML Engineer, NLP, Data Scientist, AI Engineer]
+
+  - id: budget_app
+    name: Shared Budget App
+    context: Web Development Course Project
+    url: https://github.com/alex-morgan-example/shared-budget
+    stack: [TypeScript, React, Java, PostgreSQL, REST APIs]
+    facts:
+      - web app where flatmates split bills and track shared spending
+      - Java REST API with PostgreSQL, React and TypeScript front end
+    good_for: [Full Stack, Backend Java, Software Engineer]
+
+# How the agent tailors your CV.
+cv_rules:
+  # the bold opening line starts with one of these: titles you can truthfully claim
+  titles_held: [Software Engineer, Software Developer]
+  # optional: your specialty as your degree names it. The first spelling is used on the CV.
+  specialty: [specialization in Machine Learning, specialization in ML]
+  # job title words that make a job a "specialty job"
+  specialty_job_words: [machine learning, ML, AI, data scientist, data science, deep learning, NLP, computer vision]
+  # optional: the project that leads the CV on specialty jobs (a project id from above)
+  lead_project: route_planner
+  # project contexts shown on the CV (others, like course names, are hidden)
+  show_context: [B.Sc. Final Project]
+  # job words that make the experience marked with bullets_related relevant (optional)
+  related_job_words: [robotics, robot, warehouse, logistics, automation hardware]
+  # no metrics or data counts on the CV (results live on GitHub)
+  no_metrics: true
+  summary_max_words: 65
+
+excluded_never_use:
+  - an old hackathon project that is not on GitHub
+
+writing_rules:
+  tone: formal and professional, but natural; never sound like a template or like AI
+  banned_words: [passionate, expert, guru, rockstar, ninja, synergy, leverage, cutting-edge, seasoned,
+                 results-driven, spearheaded, "I am writing to express"]
+  # words the code checks are never written about you (the home city is added automatically)
+  forbidden_words: [student, intern, internship, expected, gpa, grade point]
+  # rules for the writer, in plain words
+  never:
+    - claim a tool, number or responsibility that is not in this file
+    - say "student", "expected graduation" or "intern" about Alex
+  numbers: copy exactly as written here, rounding only as the fact itself says

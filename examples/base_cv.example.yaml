@@ -1,0 +1,75 @@
+# The general base CV: one version that fits almost every role you search for.
+# EXAMPLE for the made-up Alex Morgan. setup.py builds your own base_cv.yaml from your
+# PROFILE.yaml. Every line comes from the profile; for each approved job the agent copies
+# this file, tailors it to the posting, and renders it with cv_template/render_cv.py.
+
+name: Alex Morgan
+headline: null   # no title line under the name; the role goes in summary_lead
+contact:
+  location: United Kingdom
+  phone: "+44 7700 900123"
+  email: alex.morgan@example.com
+  linkedin: https://www.linkedin.com/in/alex-morgan-example
+  github: https://github.com/alex-morgan-example
+
+summary_lead: Software Engineer with a specialization in Machine Learning, building data pipelines and model APIs.
+summary: >-
+  Built a delivery route planner that predicts delivery times with scikit-learn and PyTorch and
+  serves plans through FastAPI and PostgreSQL. At a university data lab, built Python data
+  pipelines and a FastAPI model service. Works with Docker, Git and pytest.
+
+skills:
+  - label: Languages
+    items: [Python, SQL, TypeScript, Java]
+  - label: Machine Learning & Data
+    items: [PyTorch, scikit-learn, pandas, NumPy, Spark]
+  - label: Backend & Web
+    items: [FastAPI, PostgreSQL, REST APIs, React]
+  - label: Tools
+    items: [Git, Docker, Linux, pytest, AWS]
+
+experience:
+  - dates: "2024 – 2025"
+    role: Software Developer
+    org: Northfield University Data Lab
+    bullets:
+      - Built Python data pipelines that clean and load research survey data into PostgreSQL for the lab's analysts.
+      - Developed a FastAPI service that serves the lab's trained models to an internal dashboard.
+  - dates: "2019 – 2021"
+    role: Robotics Technician
+    org: Brightline Logistics
+    bullets:
+      - Maintained warehouse picking robots.
+
+main_project:
+  name: Delivery Route Planner
+  context: B.Sc. Final Project
+  stack: [Python, scikit-learn, PyTorch, FastAPI, PostgreSQL, React]
+  url: https://github.com/alex-morgan-example/route-planner
+  bullets:
+    - Built a planner that predicts delivery times per street segment and plans the shortest legal route for a day of deliveries.
+    - Compared gradient-boosted and PyTorch models on public delivery data, tested on a held-out month.
+    - Formulated route planning as a vehicle-routing problem with time windows.
+    - Shipped a FastAPI and PostgreSQL backend with a React and TypeScript front end, in Docker Compose, tested with pytest.
+
+second_project:
+  name: Product Review Classifier
+  context: Machine Learning Course Project
+  stack: [Python, PyTorch, scikit-learn, pandas]
+  url: https://github.com/alex-morgan-example/review-classifier
+  bullets:
+    - Classified product reviews by topic and sentiment with a small transformer fine-tuned in PyTorch.
+    - Compared it with scikit-learn baselines, starting from training data labeled with an LLM API and checked by hand.
+
+also_built:
+  - name: Shared Budget App
+    text: "Web app for splitting shared bills (Java REST API, PostgreSQL, React)"
+    url: https://github.com/alex-morgan-example/shared-budget
+
+education:
+  - dates: "2021 – 2025"
+    degree: B.Sc. Computer Science
+    track: Data Science Track
+    school: Northfield University
+    studied: machine learning, deep learning, statistics and algorithms.
+languages: English (native), Spanish (professional).

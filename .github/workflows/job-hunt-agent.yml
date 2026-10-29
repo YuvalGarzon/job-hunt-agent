@@ -1,0 +1,56 @@
+name: job-hunt-agent
+
+# OPTIONAL cloud backup: searches and answers Telegram while your Mac is asleep. The Mac worker
+# is the main way to run the agent; see "Cloud mode" in the README before turning this on.
+# Use it ONLY in a PRIVATE copy of this repo: Actions logs of a public repo are public.
+#
+# To turn on the schedule, remove the "#" in front of the three schedule lines below.
+on:
+  # schedule:
+  #   - cron: "7,22,37,52 5-18 * * *"   # every 15 min by day (UTC)
+  #   - cron: "7 21,0,3 * * *"          # 3 runs at night
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: job-hunt-agent
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Start clock
+        run: echo "RUN_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-cloud.txt
+      - name: Install
+        run: pip install --quiet --disable-pip-version-check -r requirements-cloud.txt
+      - name: Write your settings
+        # PROFILE.yaml, settings.yaml and companies.yaml are never committed: they come from secrets
+        run: |
+          printf '%s' "$PROFILE_YAML" > PROFILE.yaml
+          printf '%s' "$SETTINGS_YAML" > settings.yaml
+          printf '%s' "$COMPANIES_YAML" > companies.yaml
+        env:
+          PROFILE_YAML: ${{ secrets.PROFILE_YAML }}
+          SETTINGS_YAML: ${{ secrets.SETTINGS_YAML }}
+          COMPANIES_YAML: ${{ secrets.COMPANIES_YAML }}
+      - name: Run
+        run: python -m agent.run
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_TOKEN_ISSUED: ${{ secrets.GMAIL_TOKEN_ISSUED }}

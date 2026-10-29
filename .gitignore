@@ -1,0 +1,27 @@
+# Your own files: created by setup.py, never committed
+/PROFILE.yaml
+/settings.yaml
+/companies.yaml
+/base_cv.yaml
+/CVs/
+*.pdf
+!examples/*.pdf
+
+# Keys and tokens (they live in the macOS Keychain, never in files)
+.env
+*.pem
+*credentials*.json
+*token*.json
+service-account*.json
+service_account*.json
+client_secret*.json
+
+# Local tooling
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+.DS_Store
+*.log
+logs/
+*.zip
