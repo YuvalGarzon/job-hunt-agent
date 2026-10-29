@@ -105,6 +105,14 @@ def save_settings(s: dict) -> None:
     config.reload()
 
 
+def settings_country() -> str:
+    from agent import country
+    try:
+        return country.name() or "your country"
+    except config.SetupNeeded:
+        return "your country"
+
+
 def system_timezone() -> str:
     try:
         target = Path("/etc/localtime").resolve()
@@ -492,12 +500,57 @@ def step_alerts() -> None:
     ok("Saved")
 
 
+def save_companies(data: dict) -> None:
+    """companies.yaml, keeping the example's explanation at the top."""
+    head = "".join(line + "\n" for line in EXAMPLE_COMPANIES.read_text(encoding="utf-8").splitlines()
+                   if line.startswith("#"))
+    body = {"companies": data.get("companies") or [], "tier1_names": data.get("tier1_names") or [],
+            "tier2_names": data.get("tier2_names") or []}
+    config.COMPANIES_PATH.write_text(head + "\n" + yaml.safe_dump(body, allow_unicode=True, sort_keys=False,
+                                                                  default_flow_style=None, width=110),
+                                     encoding="utf-8")
+
+
 def step_companies() -> None:
     title("8. Companies to watch")
-    if not config.COMPANIES_PATH.exists():
-        shutil.copy(EXAMPLE_COMPANIES, config.COMPANIES_PATH)
-        ok("Started companies.yaml with large global companies (only their jobs in your country are read)")
-    if not yes("Ask Claude to find tech companies near you now? (a few minutes, uses web search)"):
+    say("The agent reads the job boards of these companies every 15 minutes, and only their jobs in")
+    say(f"{settings_country()} reach you.")
+    data = load(config.COMPANIES_PATH) or load(EXAMPLE_COMPANIES)
+    comps = data.get("companies") or []
+    for i, c in enumerate(comps, 1):
+        print(f"  {i:2}. {c['name']}  {DIM}({c['ats']}){END}")
+    drop = ask("Numbers of companies to remove (e.g. 3, 7), or Enter to keep them all")
+    gone = {int(n) for n in re.findall(r"\d+", drop) if 1 <= int(n) <= len(comps)}
+    comps = [c for i, c in enumerate(comps, 1) if i not in gone]
+    if gone:
+        ok(f"Removed {len(gone)}")
+
+    from agent import company_add
+    say("\nAdd companies you want to watch: paste a company's careers page link, or just its name.")
+    say(f"{DIM}The agent reads Greenhouse, Lever, Ashby, Comeet and Workday job boards; it finds which one a{END}")
+    say(f"{DIM}company uses. Companies on other systems can still reach you through job-alert emails.{END}")
+    while True:
+        q = ask("Careers page link or company name (Enter when done)")
+        if not q:
+            break
+        say("  Looking…")
+        found, why = company_add.detect(q)
+        if not found:
+            warn(why)
+            continue
+        if company_add.known(found, [c["name"] for c in comps]):
+            warn(f"{found['name']} is already on the list.")
+            continue
+        ok(f"{found['name']}: a {found['ats']} board with {found['jobs']} open jobs, "
+           f"{found['local']} in {settings_country()}")
+        name = ask("  Company name", found["name"])
+        favorite = yes("  Is it one of your favorite companies (its jobs score higher)?", False)
+        comps.append({"name": name, "ats": found["ats"], "board": found["board"], "tier": 1 if favorite else 3})
+    data["companies"] = comps
+    save_companies(data)
+    ok(f"companies.yaml saved: {len(comps)} companies")
+    say(f"{DIM}Later, add more in Telegram with /company <link or name>, or edit companies.yaml.{END}")
+    if not yes("Ask Claude to find more tech companies near you now? (a few minutes, uses web search)"):
         return
     from agent import scout
     from agent.sheet import Sheet

@@ -73,7 +73,10 @@ def _known(sheet: Sheet) -> tuple:
 
 
 def _home_city() -> str:
-    return str((config.profile().get("private_never_on_cv") or {}).get("home_city") or "")
+    try:
+        return str((config.profile().get("private_never_on_cv") or {}).get("home_city") or "")
+    except config.SetupNeeded:                      # setup.py may add companies before the profile exists
+        return ""
 
 
 def in_country(job) -> bool:

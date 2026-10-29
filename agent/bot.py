@@ -22,6 +22,7 @@ HELP = """<b>Commands</b>
 /pause – pause the job search
 /resume – resume the job search
 /sources – where jobs come from
+/company &lt;careers page link or name&gt; – watch a company's job board
 /job – check a job you found (link, text, screenshot, PDF or Word)
 /cv – a tailored CV for a job you found (same)
 /prep &lt;company&gt; – interview prep
@@ -862,6 +863,7 @@ MENU = [("open", "📋 Open jobs and CVs to apply"), ("mail", "📧 Check my mai
         ("job", "📥 Check a job: link, text, screenshot, PDF"), ("cv", "📄 CV for a job: link, text, screenshot"),
         ("prep", "📚 Interview prep (company)"), ("answer", "📝 Answer a form question: text or screenshot"), ("threshold", "🎯 Fit score threshold"),
         ("pause", "⏸ Pause job search"), ("resume", "▶️ Resume job search"), ("sources", "🔎 Job sources"),
+        ("company", "🏢 Watch a company: careers page link or name"),
         ("skipped", "↩️ Skipped jobs and cancelled CVs"), ("cancel", "❌ Cancel what's waiting"), ("help", "❓ Help")]
 
 
@@ -993,6 +995,43 @@ def cmd_mail(sheet, arg, ctx):
                     else "📧 The Mac is off. I'll check your email when it's back.")
 
 
+def cmd_company(sheet, arg, ctx):
+    """/company <careers page link or name>: watch that company's job board from now on (Boards tab)."""
+    from agent import company_add, intake, learn
+    from agent.sources import linkedin
+    q = arg.strip() or next(iter(intake.urls_in(ctx.get("msg") or {})), "")
+    if not q:
+        tg.send_message("🏢 Send /company with the company's careers page link or its name, e.g.\n"
+                        "<code>/company https://acme.com/careers</code> or <code>/company Acme</code>")
+        return
+    tg.send_chat_action("typing")
+    found, why = company_add.detect(q)
+    if not found:
+        tg.send_message(f"🤔 {tg.esc(why)}")
+        return
+    sheet.load("Boards")
+    names = [c["name"] for c in sources.companies()] + [r["Company"] for r in sheet.t("Boards").rows
+                                                        if r["Status"] == "found"]
+    if company_add.known(found, names):
+        tg.send_message(f"👀 I already watch <b>{tg.esc(found['name'])}</b>.")
+        return
+    tab = sheet.t("Boards")
+    key = linkedin.company_key(found["name"])
+    row = next((r for r in tab.rows if linkedin.company_key(r["Company"]) == key), None)
+    rec = {"Company": found["name"], "ATS": found["ats"], "Board": found["board"], "Status": "found",
+           "Checked": now_iso(), "About": "added by you", "Found by": "you"}
+    if row:
+        tab.update(row, **rec)
+    else:
+        tab.append(rec)
+    learn.block(sheet, found["name"], on=False)
+    sheet.flush()
+    from agent import country
+    tg.send_message(f"🏢 Now watching <b>{tg.esc(found['name'])}</b> ({tg.esc(found['ats'])}): "
+                    f"{found['jobs']} open jobs, {found['local']} in {tg.esc(country.name())}. "
+                    "The ones that fit will come to you as cards.")
+
+
 def cmd_open(sheet, arg, ctx):
     alerts.send_pending(sheet)
     alerts.send_waiting_cvs(sheet)
@@ -1004,4 +1043,5 @@ def cmd_later(sheet, arg, ctx):
 
 COMMANDS = {"/start": cmd_help, "/help": cmd_help, "/status": cmd_status, "/today": cmd_today,
             "/threshold": cmd_threshold, "/pause": cmd_pause, "/resume": cmd_resume,
-            "/sources": cmd_sources, "/job": cmd_job, "/cv": cmd_cv, "/prep": cmd_prep, "/cancel": cmd_cancel, "/open": cmd_open, "/skipped": cmd_skipped, "/mail": cmd_mail, "/answer": cmd_answer}
+            "/sources": cmd_sources, "/job": cmd_job, "/cv": cmd_cv, "/prep": cmd_prep, "/cancel": cmd_cancel, "/open": cmd_open, "/skipped": cmd_skipped, "/mail": cmd_mail, "/answer": cmd_answer,
+            "/company": cmd_company}

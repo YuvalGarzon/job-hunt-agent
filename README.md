@@ -90,7 +90,7 @@ again: finished steps are marked ✓, and you can redo any single step later, e.
 | **5. Google Sheet** | Connects the Sheet (see below) and sets up its tabs. |
 | **6. Gmail** | Signs you in to Gmail (see below). |
 | **7. Job alerts** | Which job-alert emails to read: LinkedIn, and any other job site that emails you alerts. |
-| **8. Companies** | Starts your company list and asks Claude to find tech companies near you with public job boards. |
+| **8. Companies** | Shows the starter list of large companies (remove any you don't want), lets you add the companies you want by pasting their careers page link or name, and asks Claude to find more tech companies near you. |
 | **9. Your general CV** | Builds your general CV from your profile, the one every tailored CV starts from, and opens it. |
 | **10. A first search** | Searches right away, so the first job cards arrive on Telegram. |
 | **11. Background worker** | Installs the worker so the agent runs whenever your Mac is awake. |
@@ -152,6 +152,26 @@ screen › Publish app**) and sign in once with `scripts/gmail_auth.py --product
 </details>
 
 <details>
+<summary><b>Companies to watch</b></summary>
+
+Paste a company's careers page link (or just its name) into the wizard, or send it to the bot
+later with `/company <link or name>`. The agent finds which job system the company uses
+(Greenhouse, Lever, Ashby, Comeet or Workday), reads its board once, and tells you how many
+open jobs it has in your country; from then on it is read every run.
+
+- A board link works best: `https://boards.greenhouse.io/<company>`, `https://jobs.lever.co/<company>`,
+  `https://jobs.ashbyhq.com/<company>`, `https://<company>.wd5.myworkdayjobs.com/<site>`.
+- A company's own careers page works when the page shows its job board and allows automatic reading.
+- A name works when the company's board uses its name (e.g. "Datadog").
+- Microsoft, Amazon, Google and Apple are read through their own career sites (in the starter list).
+- A company on another job system can't be watched directly; its jobs can still reach you
+  through LinkedIn or job-board alert emails.
+
+You can also edit `companies.yaml` by hand (its top explains the format). Every day at 11:00
+the agent's company scout suggests more companies near you on Telegram.
+</details>
+
+<details>
 <summary><b>Job-alert emails</b></summary>
 
 - **LinkedIn:** on linkedin.com/jobs, search for your role and place, turn on **Set alert**, and
@@ -177,6 +197,7 @@ Everything happens in your Telegram chat with the bot. The **☰ Menu** button l
 | `/answer` + a form question (text or screenshot) | writes an answer, reusing answers you saved |
 | `/prep <company>` | interview prep with likely questions, your best stories and a study plan; then 🎤 Mock interview |
 | `/open` | the jobs you haven't handled yet, and the CVs waiting for you to apply |
+| `/company <link or name>` | starts watching that company's job board |
 | `/threshold <number>` | the fit score a job needs to be sent to you |
 | `/mail` | checks your email now |
 | `/status`, `/today`, `/sources` | how the agent is doing |
@@ -199,7 +220,7 @@ committed. Edit them any time; the agent reads them on its next run.
 |---|---|---|
 | `PROFILE.yaml` | **The only source of facts about you.** Contact details, education, skills (strong / used), experience with its approved bullets, projects with their facts, and your CV rules: the titles you can claim, your specialty, which project leads which kind of job, words never to write. | [`examples/PROFILE.example.yaml`](examples/PROFILE.example.yaml) |
 | `settings.yaml` | How to search: country, home point and radius, level, roles, job types, remote, companies to avoid or prefer, alert emails, the Claude model. | [`examples/settings.example.yaml`](examples/settings.example.yaml) |
-| `companies.yaml` | The companies whose job boards are read every run (the scout adds more in the Sheet). | [`examples/companies.example.yaml`](examples/companies.example.yaml) |
+| `companies.yaml` | The companies whose job boards are read every run (`/company` and the scout add more in the Sheet's Boards tab). | [`examples/companies.example.yaml`](examples/companies.example.yaml) |
 | `base_cv.yaml` | Your general CV, the starting point of every tailored CV. | [`examples/base_cv.example.yaml`](examples/base_cv.example.yaml) |
 
 Keys and tokens (Telegram, Google, Gmail) are stored in the macOS Keychain under
@@ -253,7 +274,7 @@ agent/                the agent
   sources/            company job boards, big-company sites, LinkedIn and job-board alert emails
   filters.py score.py geo.py country.py   the rules for which jobs reach you
   cv_builder.py truth_check.py            tailored CVs and their checks
-  bot.py alerts.py intake.py writing.py answers.py tracking.py scout.py
+  bot.py alerts.py intake.py writing.py answers.py tracking.py scout.py company_add.py
 cv_template/          the CV design (HTML, rendered to PDF) and the link check
 scripts/              Keychain, Gmail sign-in, Sheet format, worker install, GitHub Secrets
 examples/             a made-up person's profile, settings, companies and CV
