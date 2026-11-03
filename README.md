@@ -53,7 +53,8 @@ send email to you.
 
 ## What you need
 
-- A computer with **macOS, Windows or Linux** and [Python](https://www.python.org/downloads/) 3.11 or newer
+- A computer with **macOS, Windows or Linux** and [Python](https://www.python.org/downloads/) 3.11 or newer.
+  Tested on macOS; Windows and Linux are supported but not yet tested (an issue report helps).
 - [Claude Code](https://claude.com/claude-code) installed and signed in (a Claude plan that includes it)
 - A Telegram account
 - A Google account (for the Sheet and Gmail; a free Google Cloud project, no billing needed)
@@ -319,3 +320,7 @@ tests/                the tests (run as the made-up person): python -m pytest
 - It never opens LinkedIn or job-board pages; it reads only their alert emails, and company
   job boards through their public APIs.
 - It only sends email to you, and it serves only your own Telegram chat.
+
+## License
+
+[MIT](LICENSE) © 2026 Yuval Garzon
