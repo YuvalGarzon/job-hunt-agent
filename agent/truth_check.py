@@ -122,7 +122,8 @@ def fact_numbers(text: str) -> list:
 
 
 SUMMARY_MAX_WORDS = 65
-RESULTS = re.compile(r"\d+(?:\.\d+)?\s*%|±|\b(?:MAE|RMSE|mAP|ROC|AUC|F1|accuracy|precision|recall)\b", re.I)
+# metric names match only in their own capitals, so the plain word "map" (a Leaflet map) passes
+RESULTS = re.compile(r"\d+(?:\.\d+)?\s*%|±|\b(?:MAE|RMSE|mAP|ROC|AUC|F1)\b|(?i:\b(?:accuracy|precision|recall)\b)")
 COUNTS = re.compile(r"\b\d[\d,.]*\s*K?\+?\s+(?:[\w-]+\s+){0,2}?(?:rows|tests|videos|trials|samples|images|"
                     r"records|seasons|frames|examples|files|lines of code)\b", re.I)
 

@@ -183,6 +183,15 @@ def test_no_results_on_the_cv():
     assert has(problems, "'88.6%'") and has(problems, "'accuracy'")
 
 
+def test_the_word_map_is_not_a_metric():
+    cv = base()
+    cv["second_project"]["bullets"][0] += " Added an interactive Leaflet map with the route."
+    assert not has(check(cv), "no results or metrics")
+    cv["second_project"]["bullets"][0] += " Reached 0.71 mAP and high Accuracy."
+    problems = check(cv)
+    assert has(problems, "'mAP'") and has(problems, "'Accuracy'")
+
+
 def test_metrics_allowed_when_the_profile_allows_them():
     p = yaml.safe_load(config.PROFILE_PATH.read_text(encoding="utf-8"))
     p["cv_rules"]["no_metrics"] = False
