@@ -83,6 +83,8 @@ def test_collect(monkeypatch):
     monkeypatch.setattr("agent.claude_cli.ask", lambda prompt, **k: CLAUDE)
     monkeypatch.setattr(board_mail, "save_post", lambda j: None)
     monkeypatch.setattr(board_mail.linkedin, "discover", lambda c, t: ({}, []))
+    marked = []
+    monkeypatch.setattr(gmail, "mark_read", lambda ids, log=print: marked.extend(ids) or len(ids))
     on_board = Job(source="greenhouse", source_ref="greenhouse:acme:1", company="Acme Data",
                    title="Junior Data Engineer", location="Salford", url="https://boards.greenhouse.io/acme/jobs/1")
     sheet = FakeSheet()
@@ -92,7 +94,9 @@ def test_collect(monkeypatch):
     assert (j.source, j.company, j.title, j.employment) == ("indeed", "?", "QA Tester", "Full-time")
     assert j.extra["unverified"] and j.source_ref == "mail:indeed:m1:222"
     assert sheet.kv["indeed_after"] == str(now_ms // 1000)
+    assert marked == ["m1"]                                                 # read by the agent: marked as read
     assert board_mail.collect(sheet, [], [], log=lambda *a: None) == []    # the cursor's own email is not read again
+    assert marked == ["m1"]
 
 
 def test_account_emails_never_reach_claude(monkeypatch):
@@ -101,9 +105,12 @@ def test_account_emails_never_reach_claude(monkeypatch):
     monkeypatch.setattr(gmail, "message", lambda mid: {"id": mid, "received_ms": 2_000_000_000_000, "html": "",
                                                         "text": "x", "subject": "Your password reset code"})
     monkeypatch.setattr(board_mail, "parse_with_claude", lambda *a: (_ for _ in ()).throw(AssertionError("sent")))
+    marked = []
+    monkeypatch.setattr(gmail, "mark_read", lambda ids, log=print: marked.extend(ids) or len(ids))
     sheet = FakeSheet()
     assert board_mail.collect(sheet, [], [], log=lambda *a: None) == []
     assert sheet.kv["indeed_after"] == "2000000000"
+    assert marked == []                                  # a password email stays unread
 
 
 def test_board_job_is_tagged_and_never_fetched(monkeypatch):
@@ -137,3 +144,24 @@ def test_cv_uses_the_email_text(monkeypatch, tmp_path):
     assert "data pipelines" in job["description"]
     (tmp_path / "J1.txt").write_text("saved text", encoding="utf-8")
     assert tasks._job_from_sheet(S(), "J1")["description"] == "saved text"   # saved copy first
+
+
+def test_mark_read_only_removes_unread_and_survives_an_old_sign_in(monkeypatch):
+    from agent import gmail
+    sent = []
+
+    class R:
+        status_code = 204
+
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(gmail, "_headers", lambda scopes=None: {"Authorization": "Bearer t"})
+    monkeypatch.setattr(gmail.requests, "post", lambda url, json=None, **k: sent.append((url, json)) or R())
+    assert gmail.mark_read(["a", "b", "a"]) == 2
+    assert sent == [(f"{gmail.API}/messages/batchModify", {"ids": ["a", "b"], "removeLabelIds": ["UNREAD"]})]
+    logs = []
+
+    def no_permission(scopes=None):
+        raise gmail.RefreshError("invalid_scope")
+    monkeypatch.setattr(gmail, "_headers", no_permission)
+    assert gmail.mark_read(["c"], log=logs.append) == 0 and "gmail_auth" in logs[0]

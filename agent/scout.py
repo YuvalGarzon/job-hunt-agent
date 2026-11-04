@@ -3,8 +3,10 @@ large companies) near the user.
 
 Once a day from 11:00 (computer, Claude with web search) Claude suggests tech companies near the
 user's home city that are not watched yet, a different sector mix each day. Each suggestion is
-checked against the company's public job board API (Greenhouse, Lever, Ashby, Comeet); job-board
-sites and LinkedIn are never opened (rule 4).
+checked against the company's public job board API (Greenhouse, Lever, Ashby, Comeet, Workday,
+Workable, Recruitee, SmartRecruiters), also the board its careers page points to
+(agent/sources/detect.py); job-board sites and LinkedIn are never opened (rule 4). Companies kept
+as "suggested" get their careers page checked again every two weeks.
 - A company with a public board that has jobs in the user's country is added to the Boards tab
   ("found"), so every search from now on reads it and fitting jobs arrive as normal cards.
 - A company without a public board is kept as "suggested": the agent cannot watch it.
@@ -15,13 +17,14 @@ setup.py runs the same search once, so a new user starts with companies near the
 import json
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 
 import requests
 
 from agent import alerts, claude_cli, config, country, filters, learn, sources
 from agent import telegram as tg
 from agent.sheet import TZ, Sheet, now_iso
-from agent.sources import ats
+from agent.sources import ats, bigco
 from agent.sources.linkedin import _slugs, company_key
 
 SCOUT_HOUR = 11
@@ -87,19 +90,56 @@ def in_country(job) -> bool:
         bool(city and re.search(r"(?<!\w)" + re.escape(city) + r"(?!\w)", loc, re.I))
 
 
-def _board(name: str, kind: str, board: str) -> tuple:
-    """(ats, board, local jobs) for a board that answers and lists jobs in the country, else ("", "", [])."""
-    tries = [(kind, board.strip())] if kind in ats.FETCHERS and board.strip() else []
-    tries += [(k, s) for s in _slugs(name) for k in ("greenhouse", "ashby", "lever")]
+def _page_boards(careers: str) -> list:
+    """(ats, board) pairs a careers page points to (agent/sources/detect.py); [] if none."""
+    from agent.sources import detect
+    return detect.boards_on_page(careers)
+
+
+def _fetchers() -> dict:
+    return {**ats.FETCHERS, "workday": bigco.FETCHERS["workday"]}
+
+
+def _board(name: str, kind: str, board: str, careers: str = "") -> tuple:
+    """(ats, board, local jobs) for a board that answers and lists jobs in the country, else ("", "", []).
+    Tried in order: the board given, the boards the careers page links to, then boards guessed from
+    the name and from the careers page's host."""
+    fetchers = _fetchers()
+    tries = [(kind, board.strip())] if kind in fetchers and board.strip() else []
+    tries += _page_boards(careers)
+    host = urlsplit(careers).netloc.lower().removeprefix("www.") if careers else ""
+    slugs = list(dict.fromkeys(_slugs(name) + ([host, host.split(".")[0]] if host else [])))
+    tries += [(k, s) for s in slugs for k in ("greenhouse", "ashby", "lever")]
     for k, b in dict.fromkeys(tries):
         try:
-            jobs = ats.FETCHERS[k]({"name": name, "ats": k, "board": b, "tier": 3})
+            jobs = fetchers[k]({"name": name, "ats": k, "board": b, "tier": 3})
         except (requests.RequestException, ValueError, KeyError, TypeError):
             continue
         local = [j for j in jobs if in_country(j)]
         if local:
             return k, b, local
     return "", "", []
+
+
+RECHECK_PER_RUN = 15
+RECHECK_DAYS = 14
+
+
+def recheck_pages(sheet: Sheet, limit: int = RECHECK_PER_RUN, log=print) -> int:
+    """Companies kept as 'suggested' with a careers page: look again for a board the page points
+    to (a few a day, each again after RECHECK_DAYS), since sites change. Returns how many are now
+    watched."""
+    from agent.sources.linkedin import _age_days
+    rows = [r for r in sheet.t("Boards").rows if r["Status"] == "suggested" and r["Careers"].startswith("http")
+            and _age_days(r["Checked"]) > RECHECK_DAYS]
+    now_watched = 0
+    for r in rows[:limit]:
+        kind, board, jobs = _board(r["Company"], "", "", r["Careers"])
+        sheet.t("Boards").update(r, Checked=now_iso(), **({"ATS": kind, "Board": board, "Status": "found"} if kind else {}))
+        if kind:
+            now_watched += 1
+            log(f"scout: {r['Company']} is now watched ({kind} {board}, {alerts.count(len(jobs), 'local job')})")
+    return now_watched
 
 
 def ask_claude(names: list, n: int = MAX_SUGGEST) -> list:
@@ -131,10 +171,10 @@ def scout(sheet: Sheet, notify: bool = True, log=print) -> tuple:
         if not key or key in known:
             continue
         known.add(key)
-        kind, board, jobs = _board(name, str(c.get("ats") or "").lower(), str(c.get("board") or ""))
         careers = str(c.get("careers") or "")
         if not careers.startswith("http"):
             careers = ""
+        kind, board, jobs = _board(name, str(c.get("ats") or "").lower(), str(c.get("board") or ""), careers)
         fit = [j for j in jobs if not filters.cheap_drop(j)]
         tab.append({"Company": name, "ATS": kind, "Board": board, "Status": "found" if kind else "suggested",
                     "Checked": now_iso(), "About": " · ".join(str(c.get(k) or "") for k in ("about", "why"))[:300],
@@ -151,7 +191,9 @@ def scout(sheet: Sheet, notify: bool = True, log=print) -> tuple:
 
 def run_task(sheet: Sheet, task: dict, payload: dict, log) -> str:
     found, added, watched = scout(sheet, log=log)
-    log(f"scout: {found} suggested, {added} new, {watched} watched")
+    rechecked = recheck_pages(sheet, log=log)
+    sheet.flush()
+    log(f"scout: {found} suggested, {added} new, {watched} watched, {rechecked} older ones now watched")
     return f"{added} new compan{'y' if added == 1 else 'ies'}"
 
 

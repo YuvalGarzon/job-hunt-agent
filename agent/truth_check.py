@@ -310,6 +310,9 @@ def check(content: dict, related: bool = False, profile: dict = None) -> list:
     shown = {pr["name"] for pr in (mp, sp) if pr}
 
     also = content.get("also_built") or []
+    if any(not isinstance(i, dict) for i in also):
+        problems.append("Each also_built item must be {text: ..., url: ...} with the project's url, not a plain line")
+        also = [i for i in also if isinstance(i, dict)]
     if len(also) > 3:
         problems.append("Also built may have at most 3 projects")
     seen = set()

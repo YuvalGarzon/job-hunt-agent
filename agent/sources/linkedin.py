@@ -120,7 +120,7 @@ def discover(company: str, titles: list) -> tuple:
 def boards(sheet: Sheet) -> list:
     """Boards found through LinkedIn alerts, in companies.yaml form."""
     return [{"name": r["Company"], "ats": r["ATS"], "board": r["Board"], "tier": 3}
-            for r in sheet.t("Boards").rows if r["Status"] == "found" and r["ATS"] in ats.FETCHERS]
+            for r in sheet.t("Boards").rows if r["Status"] == "found" and (r["ATS"] in ats.FETCHERS or r["ATS"] == "workday")]  # any reader in ats.py
 
 
 # --- one run -----------------------------------------------------------------------------
@@ -147,6 +147,7 @@ def collect(sheet: Sheet, fetched: list, known_companies: list, log=print) -> li
                                 location=a.location, url=a.url, extra={"unverified": True, "via_linkedin": a.li_id}),
                   log=log)
     sheet.kv_set("Health", CURSOR, str(newest), flush=False)
+    gmail.mark_read(ids, log=log)                         # read by the agent: not left unread in the inbox
     on_known = len(alerts) - len(out)
     log(f"linkedin: {len(ids)} emails, {len(alerts)} jobs, {on_known} on known boards, "
         f"{sum(1 for j in out if not j.extra.get('unverified'))} on new boards, "

@@ -3,8 +3,10 @@
 The refresh token comes from the system keychain (computer) or GitHub Secrets (cloud); the short-lived
 access tokens live only in memory. Reading uses a token narrowed to gmail.readonly; sending
 uses one narrowed to gmail.send, and send_to_self() can only write to the user's own address
-(read from the Gmail profile; there is no recipient parameter). Nothing here can change or
-delete mail.
+(read from the Gmail profile; there is no recipient parameter). The one change it makes to mail:
+mark_read() marks the job-alert emails it has read as read (gmail.modify, used only to remove
+the UNREAD label), so unread alerts in the inbox do not look like jobs that were missed. Nothing
+here deletes, moves or archives mail.
 """
 import base64
 import email.message
@@ -21,6 +23,7 @@ from agent import secrets
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
 READONLY = ["https://www.googleapis.com/auth/gmail.readonly"]
 SEND = ["https://www.googleapis.com/auth/gmail.send"]
+MODIFY = ["https://www.googleapis.com/auth/gmail.modify"]
 TIMEOUT = 20
 _creds = {}
 
@@ -44,6 +47,30 @@ def _headers(scopes: list = READONLY) -> dict:
             raise
         _creds[key] = c
     return {"Authorization": f"Bearer {c.token}"}
+
+
+def mark_read(ids: list, log=print) -> int:
+    """Mark these emails as read (remove the UNREAD label, nothing else). Returns how many; 0 and
+    one log line if the sign-in has no permission for it yet (an older sign-in: sign in again)."""
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        return 0
+    try:
+        headers = _headers(MODIFY)
+    except (RefreshError, GmailAuthError) as e:
+        log(f"gmail: emails not marked as read: the Gmail sign-in has no permission for it yet "
+            f"(run scripts/gmail_auth.py again) [{e.__class__.__name__}]")
+        return 0
+    done = 0
+    for i in range(0, len(ids), 1000):                  # batchModify takes up to 1000 ids
+        r = requests.post(f"{API}/messages/batchModify", json={"ids": ids[i:i + 1000], "removeLabelIds": ["UNREAD"]},
+                          headers=headers, timeout=TIMEOUT)
+        if r.status_code == 403:
+            log("gmail: emails not marked as read: no permission (run scripts/gmail_auth.py again)")
+            return done
+        r.raise_for_status()
+        done += len(ids[i:i + 1000])
+    return done
 
 
 def search(query: str, limit: int = 100) -> list:

@@ -1,11 +1,19 @@
 """Telegram batch alerts: all new relevant jobs of a run in one batch, best first."""
 import re
+from datetime import date, datetime
 
-from agent import telegram as tg
-from agent.sheet import Sheet, now_iso
+from agent import filters, telegram as tg
+from agent.sheet import TZ, Sheet, now_iso
 from agent.sources import board_mail
 
 BATCH_SIZE = 10
+
+
+def _days_up(posted: str) -> int:
+    try:
+        return (datetime.now(TZ).date() - date.fromisoformat((posted or "")[:10])).days
+    except ValueError:
+        return 0
 
 
 def count(n: int, word: str) -> str:
@@ -39,6 +47,10 @@ def job_text(r: dict, number: int) -> str:
     if r.get("Source") in boards:
         name = boards[r["Source"]][1]
         tags.append(f"📰 from {'an' if name[:1].lower() in 'aeiou' else 'a'} {name} alert, not verified on the company site")
+    days = _days_up(r.get("Posted"))
+    if days > filters.MAX_AGE_DAYS:
+        ago = f"over {filters.MAX_AGE_DAYS}" if days <= filters.MAX_AGE_DAYS + 1 else str(days)   # Workday says only "30+ days"
+        tags.append(f"🕰 posted {ago} days ago, still open on the company site")
     if tags:
         lines.append(" · ".join(tags))
     m = TWIN_RE.search(r.get("Reason") or "")

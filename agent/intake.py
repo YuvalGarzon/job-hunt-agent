@@ -183,7 +183,7 @@ def _company_for(kind: str, board: str) -> str:
 def _job(kind: str, board: str, ref: str, one: dict, company: str) -> Job:
     return Job(source=kind, source_ref=f"{kind}:{board}:{ref}", company=company or board.split("/")[0].split(".")[0].title(),
                title=one["title"].strip(), location=one.get("location", ""), url=one["url"],
-               description=one["description"])
+               id_url=one.get("id_url", ""), description=one["description"])
 
 
 def resolve_ats(url: str):
@@ -194,6 +194,10 @@ def resolve_ats(url: str):
     try:
         if host.endswith("greenhouse.io") and len(parts) >= 3 and parts[-2] == "jobs":
             board, jid = parts[-3], parts[-1]
+            one = ats.greenhouse_one(board, jid)
+            return one and _job("greenhouse", board, jid, one, _company_for("greenhouse", board))
+        if host.endswith("greenhouse.io") and q.get("for") and q.get("token"):   # Greenhouse's embed job page
+            board, jid = q["for"][0], q["token"][0]
             one = ats.greenhouse_one(board, jid)
             return one and _job("greenhouse", board, jid, one, _company_for("greenhouse", board))
         if "gh_jid" in q:                                      # a company site embedding Greenhouse

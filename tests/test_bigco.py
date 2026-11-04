@@ -41,8 +41,9 @@ def test_workday_posted(text, days):
     assert abs((datetime.now(timezone.utc) - got) - timedelta(days=days)) < timedelta(minutes=1)
 
 
-def test_workday_old_posting_dropped_before_detail():
-    assert filters.cheap_drop(mk(posted=bigco._wd_posted("Posted 30+ Days Ago"))).startswith("posted")
+def test_workday_old_posting_still_listed_is_kept():
+    # listed by the company's own careers site right now, so open whatever its date
+    assert not filters.cheap_drop(mk(posted=bigco._wd_posted("Posted 30+ Days Ago")))
 
 
 def test_workday_location_from_path():

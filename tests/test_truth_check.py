@@ -271,3 +271,25 @@ def test_example_cv_renders_on_one_page(tmp_path):
     profile = yaml.safe_load(config.PROFILE_PATH.read_text(encoding="utf-8"))
     assert render_cv.render(str(config.EXAMPLES / "base_cv.example.yaml"), str(tmp_path / "Alex Morgan CV.pdf"),
                             profile) == 1
+
+
+def test_a_line_or_two_over_one_page_is_cut_by_the_code(tmp_path):
+    import pymupdf
+    from agent import cv_builder
+    cv = base()
+    cv["also_built"] = [{"text": "a", "url": "u1"}, {"text": "b", "url": "u2"}]
+    cv["second_project"]["bullets"] = ["one", "two", "three"]
+    assert cv_builder.trim_cut(cv) == "dropped the last Also built line" and len(cv["also_built"]) == 1
+    assert cv_builder.trim_cut(cv) == "dropped the last second-project bullet"
+    assert cv["second_project"]["bullets"] == ["one", "two"]
+    assert cv_builder.trim_cut(cv) == ""                 # the minimums stay
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "page one")
+    doc.new_page().insert_text((72, 72), "spilled line one\nspilled line two")
+    doc.save(tmp_path / "cv.pdf")
+    assert cv_builder.overflow_lines(tmp_path / "cv.pdf") == 2
+
+
+def test_also_built_as_plain_lines_is_a_problem_not_a_crash(cv):
+    cv["also_built"] = ["Crowd anomaly detection with CLIP and YOLOv8"]
+    assert has(check(cv), "Each also_built item must be")

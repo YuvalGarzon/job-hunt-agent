@@ -221,8 +221,17 @@ def remote_check(job, loc: dict) -> str:
     return ""
 
 
+def on_company_site(job) -> bool:
+    """Listed right now by the company's own careers system: open, whatever date it was posted."""
+    from agent import sources
+    return job.source in sources.ONE
+
+
 def recency_check(job, now: datetime = None) -> str:
-    if not job.posted:
+    """Old postings seen only in an alert or a post are dropped. A posting the company's own careers
+    system still lists is open (many stay up for months), so it is never dropped for its date; the
+    card says how old it is."""
+    if not job.posted or on_company_site(job):
         return ""
     now = now or datetime.now(timezone.utc)
     try:

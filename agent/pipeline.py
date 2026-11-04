@@ -78,6 +78,14 @@ def evaluate(job, loc: dict, tiers: dict) -> tuple:
     return row, ""
 
 
+def reconsider(rows: list) -> dict:
+    """Jobs dropped only for their date while the company's own careers system lists them: since
+    2026-11-04 a job still listed there is open whatever its date, so each one is looked at again
+    by the normal rules the next time it is fetched (its row is updated, not added again)."""
+    return {r["Job ID"]: r for r in rows if r["Decision"] == "dropped" and re.match(r"posted \d+ days ago$", r["Reason"])
+            and r["Source"] in sources.ONE}
+
+
 def _geo_cache(sheet: Sheet) -> dict:
     cache = {}
     for r in sheet.t("Geo").rows:
@@ -103,7 +111,16 @@ def find_and_alert(sheet: Sheet, send: bool = True, log=print) -> dict:
         log("paused: not searching")
         return {"paused": True}
     jobs_tab = sheet.t("Jobs")
-    seen = {r["Job ID"] for r in jobs_tab.rows}
+    again = reconsider(jobs_tab.rows)
+    seen = {r["Job ID"] for r in jobs_tab.rows} - set(again)
+
+    def record(row: dict) -> None:
+        """A new row, or the job's earlier row when it is looked at again."""
+        old = again.pop(row["Job ID"], None)
+        if old is None:
+            jobs_tab.append(row)
+        else:
+            jobs_tab.update(old, **{k: v for k, v in row.items() if k in jobs_tab.header})
     cache = _geo_cache(sheet)
     cache_before = set(cache)
     budget = [GEOCODE_BUDGET]
@@ -172,11 +189,11 @@ def find_and_alert(sheet: Sheet, send: bool = True, log=print) -> dict:
             reason = sent.before(job.company, job.title, job.source_ref)
         if reason:
             stats["dropped"] += 1
-            jobs_tab.append({**row, "Decision": "dropped", "Reason": reason})
+            record({**row, "Decision": "dropped", "Reason": reason})
             continue
         if row["Score"] < thr:
             stats["below"] += 1
-            jobs_tab.append({**row, "Decision": "below_threshold", "Reason": f"score {row['Score']} < {thr}"})
+            record({**row, "Decision": "below_threshold", "Reason": f"score {row['Score']} < {thr}"})
             continue
         candidates.append((job, row, tiers.get(job.company.lower(), job.tier)))
         sent.add(job.company, job.title, row["First seen"][:10], job.source_ref)
@@ -192,7 +209,7 @@ def find_and_alert(sheet: Sheet, send: bool = True, log=print) -> dict:
             continue
         if v:
             stats["dropped"] += 1
-            jobs_tab.append({**row, "Decision": "dropped", "Reason": v})
+            record({**row, "Decision": "dropped", "Reason": v})
             continue
         if job.extra.get("verify_note"):
             row["Reason"] = "; ".join(filter(None, [row.get("Reason", ""), job.extra["verify_note"]]))
@@ -210,7 +227,7 @@ def find_and_alert(sheet: Sheet, send: bool = True, log=print) -> dict:
     batch_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M") + "-" + uuid.uuid4().hex[:4]
     for rank, (job, row, tier) in enumerate(alertable, start=1):
         decision = "alerting" if rank <= BATCH_SIZE else "more_pending"
-        jobs_tab.append({**row, "Decision": decision, "Batch ID": batch_id, "Rank": rank})
+        record({**row, "Decision": decision, "Batch ID": batch_id, "Rank": rank})
     stats["alert"] = len(alertable)
     sheet.flush()                                 # record before sending: a crash never loses a job
 

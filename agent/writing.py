@@ -17,6 +17,7 @@ from agent.truth_check import check_text
 
 CHAT_LOG = config.STATE_DIR / "chat.jsonl"
 CHAT_TURNS = 12
+CHAT_KEEP_MIN = 30   # a follow-up this soon after a turn about a job stays on that job
 MOCK_HOURS = 3
 MAX_WORDS = 200
 
@@ -210,22 +211,45 @@ search: advice, which jobs to prioritize, explaining a posting, drafting a messa
 recruiter or a LinkedIn note (drafts only, {first} sends them). Anything written about {first}
 must use only facts from PROFILE and obey PROFILE.writing_rules; never invent experience. Never
 reveal anything from private_never_on_cv. If you do not know something, say so.
-ACTIONS: the chat can show real job cards with Approve/Skip buttons. If {first} asks to see or get
-the jobs not handled yet (open / pending / not approved / not skipped), do NOT write a list:
-answer with one short line and add the token [[PENDING_JOBS]]. If {first} asks for the CVs that
-are ready / waiting to apply / not marked applied, add [[WAITING_CVS]]. You may add both. Never
-write those tokens otherwise.
-JOB ACTIONS: when {first} says something that changes a job's state, add ONE token for it, with
-the job's id from THE JOB or THE SEARCH NOW (never guess an id; if unsure which job, ask):
-[[ACT:applied:<job id>]] applied / sent the CV; [[ACT:closed:<job id>]] the job is closed or
-taken; [[ACT:skip:<job id>]] not interested; [[ACT:approve:<job id>]] wants a tailored CV;
-[[ACT:card:<job id>]] wants to see the job again. A token only shows a button to confirm; say
-in your answer to tap it.
+WHAT YOU SEE: PROFILE; THE SEARCH NOW and THE JOB (read from {first}'s Google Sheet for this
+message); THE JOB's posting and whether {first} applied to it; the last 12 chat messages. You
+cannot open links, browse or read files yourself, and you do not remember older chats. But the
+agent you are part of does a lot, so never say something cannot be done when the agent does it:
+- by itself: searches company career sites and job-alert emails all day and sends job cards with
+  Approve/Skip; builds a tailored one-page CV on Approve; reads Gmail for company replies and
+  updates the sheet; checks once a day whether company-site jobs are still open; offers a
+  follow-up a week after an application; sends a daily summary.
+- anything {first} sends as a link, a forwarded post, a screenshot, a photo, a PDF or a Word file
+  is checked by the agent automatically (not by you) and comes back as a job card.
+- commands to point to: /answer (an application-form question, from text or a screenshot; keeps
+  a bank of saved answers), /threshold (the fit score for sending jobs), /pause and /resume (the
+  search), /skipped (bring back skipped jobs or cancelled CVs), /company (add a company to watch),
+  /status, /today, /sources (where jobs come from), /cancel.
+TOKENS: put them at the end of your answer; each shows a button or starts the work.
+- [[PENDING_JOBS]]: {first} asks to see the jobs not handled yet (open / pending / not approved /
+  not skipped): do NOT write a list, answer with one short line and add it.
+- [[WAITING_CVS]]: {first} asks for the CVs that are ready / waiting to apply / not marked applied.
+- [[MAIL_NOW]]: {first} wants the mail checked now (a company reply, an email that came in).
+- [[ADD_JOB]]: the message is a job posting (pasted text) that is not THE JOB: the agent checks it
+  and sends a card. [[ADD_JOB_CV]] instead if {first} also wants a CV for it. Say it is being checked.
+- JOB ACTIONS, ONE per job, with the job's id from THE JOB or THE SEARCH NOW (never guess an id; if
+  unsure which job, ask): [[ACT:applied:<job id>]] applied / sent the CV; [[ACT:closed:<job id>]]
+  the job is closed or taken; [[ACT:skip:<job id>]] not interested; [[ACT:approve:<job id>]] wants
+  a tailored CV; [[ACT:card:<job id>]] wants to see the job again; [[ACT:fix:<job id>]] wants to
+  change the CV for it (writes what after tapping); [[ACT:cover:<job id>]] a cover letter for it;
+  [[ACT:prep:<job id>]] interview prep for that company (it ends with a mock interview button).
+  fix and cover need a CV already built for the job (an application).
+  A job action only shows a button to confirm: say in your answer to tap it.
+Never write any token otherwise.
 {mode}
 PROFILE:
 {profile}
 
-THE SEARCH NOW:
+THE SEARCH NOW (read from {first}'s Google Sheet just now, the same sheet {first} sees: if asked
+to check the sheet, this is it, so answer from it and never say you cannot see it. Applications
+has every application. Recent job alerts are only the latest 15: the sheet has many more jobs, so
+a job missing from them may still be there; never say a job is not in the sheet. If the message
+names a job by its company and title, it is looked up and given as THE JOB):
 {state}
 {job}{replied}
 RECENT CONVERSATION:
@@ -241,10 +265,55 @@ point), then the next question. Mix technical (algorithms, ML if relevant, syste
 and what to practice."""
 
 
-def _log_turn(role: str, text: str) -> None:
+def _log_turn(role: str, text: str, job_id: str = "") -> None:
     CHAT_LOG.parent.mkdir(parents=True, exist_ok=True)
+    turn = {"t": now_iso(), "role": role, "text": text[:3000], **({"job_id": job_id} if job_id else {})}
     with CHAT_LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"t": now_iso(), "role": role, "text": text[:3000]}, ensure_ascii=False) + "\n")
+        f.write(json.dumps(turn, ensure_ascii=False) + "\n")
+
+
+def _recent_chat_job() -> str:
+    """The job the last chat turn was about, if that turn was under CHAT_KEEP_MIN minutes ago; '' otherwise."""
+    if not CHAT_LOG.exists():
+        return ""
+    lines = CHAT_LOG.read_text(encoding="utf-8").splitlines()
+    try:
+        last = json.loads(lines[-1])
+        fresh = datetime.now(TZ) - datetime.fromisoformat(last["t"]) < timedelta(minutes=CHAT_KEEP_MIN)
+    except (IndexError, ValueError, KeyError):
+        return ""
+    return last.get("job_id", "") if fresh else ""
+
+
+def _job_in_text(sheet: Sheet, text: str) -> str:
+    """A pasted posting: the job in the sheet whose title (and company, or a long paste) is in the message."""
+    low = text.lower()
+    apps = {a["Job ID"] for a in sheet.t("Applications").rows}
+    hits = [r for r in sheet.t("Jobs").rows if len(r["Title"]) >= 10 and r["Title"].lower() in low
+            and (r["Company"].lower() in low or len(text) > 300)]
+    best = max(hits, key=lambda r: (len(r["Title"]), r["Job ID"] in apps, bool(r["Alert msg ID"])), default=None)
+    return best["Job ID"] if best else ""
+
+
+def _application_line(sheet: Sheet, job_id: str) -> str:
+    a = sheet.t("Applications").find("Job ID", job_id)
+    if not a:
+        return "Application for it: NONE, not applied (no application for it in the sheet)."
+    return (f"Application for it: {a['Status']}; applied {a['Date applied'] or 'not yet'}; "
+            f"app id {a['App ID']}. {_cv_line(sheet, a)}")
+
+
+def _cv_line(sheet: Sheet, app: dict) -> str:
+    """Where the CV for an application is, so the chat never says it is ready while it is still being built."""
+    builds = [t for t in sheet.t("Queue").rows if t["Type"] == "build_cv" and t["App ID"] == app["App ID"]]
+    if any(t["Status"] in ("pending", "in_progress") for t in builds):
+        return ("Its CV: BEING BUILT RIGHT NOW (takes a few minutes); it is NOT ready yet. Say it is on the way and "
+                "will arrive in this chat by itself when done.")
+    if app.get("CV path"):
+        return "Its CV: built and already sent in this chat (scroll up to the PDF)."
+    if any(t["Status"] == "failed" for t in builds):
+        return "Its CV: the build failed; no CV yet. Offer the approve button to try again."
+    return "Its CV: not built yet."
 
 
 def _history() -> str:
@@ -255,8 +324,10 @@ def _history() -> str:
 
 
 def _state(sheet: Sheet) -> str:
-    sheet.load("Applications", "Jobs")
-    apps = [f"- {a['Company']} · {a['Role']} · {a['Status']} · applied {a['Date applied'] or '-'} · job id {a['Job ID']}"
+    sheet.load("Applications", "Jobs", "Queue")
+    building = {t["App ID"] for t in sheet.t("Queue").rows if t["Type"] == "build_cv" and t["Status"] in ("pending", "in_progress")}
+    cv = lambda a: "CV being built now" if a["App ID"] in building else ("CV sent" if a.get("CV path") else "no CV")
+    apps = [f"- {a['Company']} · {a['Role']} · {a['Status']} · {cv(a)} · applied {a['Date applied'] or '-'} · job id {a['Job ID']}"
             for a in sheet.t("Applications").rows if a["Status"] != "Withdrawn"]
     alerted = [r for r in sheet.t("Jobs").rows if r["Decision"] in ("alerted", "forwarded")][-15:]
     jobs = [f"- {r['Company']} · {r['Title']} · score {r['Score']} · {r['User action'] or 'no action'}"
@@ -264,7 +335,8 @@ def _state(sheet: Sheet) -> str:
     return "Applications:\n" + ("\n".join(apps) or "none") + "\nRecent job alerts:\n" + "\n".join(jobs)
 
 
-ACT_LABEL = {"applied": "📨 I applied", "closed": "🔒 It's closed", "skip": "⏭ Skip", "approve": "✅ Approve (CV)"}
+ACT_LABEL = {"applied": "📨 I applied", "closed": "🔒 It's closed", "skip": "⏭ Skip", "approve": "✅ Approve (CV)",
+             "fix": "✏️ Fix the CV", "cover": "📝 Cover letter", "prep": "📚 Interview prep"}
 
 
 def _act_buttons(sheet: Sheet, acts: list) -> tuple:
@@ -279,10 +351,33 @@ def _act_buttons(sheet: Sheet, acts: list) -> tuple:
             cards.append(job)
             continue
         app = sheet.t("Applications").find("Job ID", job_id)
+        if kind in ("fix", "cover") and not app:       # no CV built for it yet
+            continue
         data = {"applied": f"applied:{app['App ID']}" if app else f"japplied:{job_id}",
-                "closed": f"closed:{job_id}", "skip": f"sk:{job_id}", "approve": f"ap:{job_id}"}[kind]
+                "closed": f"closed:{job_id}", "skip": f"sk:{job_id}", "approve": f"ap:{job_id}",
+                "fix": f"fix:{app['App ID']}" if app else "", "cover": f"cl:{app['App ID']}" if app else "",
+                "prep": f"prep:{job['Company'][:40]}"}[kind]
         rows.append([(f"{ACT_LABEL[kind]}: {job['Company'][:20]}", data)])
     return rows, cards
+
+
+def last_sent_job(sheet: Sheet) -> str:
+    """The job of the newest job card or CV the bot sent (Telegram message ids only grow); '' if none."""
+    sent = [(int(r["Alert msg ID"]), r["Job ID"]) for r in sheet.t("Jobs").rows if str(r["Alert msg ID"]).isdigit()]
+    for t in sheet.t("Queue").rows:
+        m = re.search(r'"sent_msg": (\d+)', t["Result"]) if t["Type"] == "build_cv" else None
+        if m:
+            sent.append((int(m.group(1)), t["Job ID"]))
+    return max(sent)[1] if sent else ""
+
+
+def _posting(sheet: Sheet, job_id: str) -> str:
+    """The posting's text as the CV builder got it (fetched again from its board if needed)."""
+    from agent.tasks import _job_from_sheet
+    try:
+        return _job_from_sheet(sheet, job_id)["description"][:8000]
+    except Exception as e:  # the board may be down or the posting closed
+        return f"(not available: {e.__class__.__name__}; say so if asked about the posting)"
 
 
 def chat(sheet: Sheet, task: dict, payload: dict, log) -> str:
@@ -296,12 +391,22 @@ def chat(sheet: Sheet, task: dict, payload: dict, log) -> str:
     else:
         mode = ""
     job = ""
-    if payload.get("job_id"):
-        sheet.load("Jobs")
-        r = sheet.t("Jobs").find("Job ID", payload["job_id"])
-        if r:
-            job = (f"THE JOB (the message is about it; job id {r['Job ID']}): {r['Title']} at {r['Company']} "
-                   f"({r['URL']}). Fit: {r['Fit']}. Gaps: {r['Gaps']}\n")
+    sheet.load("Jobs", "Queue", "Applications")
+    # which job 'this job' means: the one replied to, a posting pasted in the message, the one the
+    # chat was just about, else the last card or CV sent
+    found = [(payload.get("job_id"), "this message is a reply to your message about this job, so 'this job' / "
+                                     "'it' means THIS one, even if the earlier conversation was about another job"),
+             (_job_in_text(sheet, text), "the message contains this job's posting; it is already in the sheet"),
+             (_recent_chat_job(), "your last messages were about this job; a follow-up is still about it "
+                                  "unless the message names another"),
+             (last_sent_job(sheet), "not a reply: the last job you sent a card or CV for, so 'the job' / 'it' "
+                                    "means this one unless the message names another")]
+    job_id, which = next(((j, w) for j, w in found if j), ("", ""))
+    r = sheet.t("Jobs").find("Job ID", job_id) if job_id else None
+    if r:
+        job = (f"THE JOB ({which}; job id {r['Job ID']}): {r['Title']} at {r['Company']} "
+               f"({r['URL']}). Fit: {r['Fit']}. Gaps: {r['Gaps']}\n{_application_line(sheet, r['Job ID'])}\n"
+               f"THE POSTING (answer questions about the job from it):\n{_posting(sheet, r['Job ID'])}\n")
     replied = ""
     if payload.get("replied_text"):
         replied = f"THIS IS A REPLY TO A MESSAGE YOU SENT EARLIER:\n{payload['replied_text'][:1500]}\n"
@@ -309,14 +414,22 @@ def chat(sheet: Sheet, task: dict, payload: dict, log) -> str:
     answer = claude_cli.ask(CHAT.format(first=config.first_name(), mode=mode, profile=_profile_for_writing(),
                                         state=_state(sheet), job=job, replied=replied,
                                         history=_history(), text=text[:4000])).strip()
-    _log_turn("user", text)
-    _log_turn("assistant", answer)
+    _log_turn("user", text, r["Job ID"] if r else "")
+    _log_turn("assistant", answer, r["Job ID"] if r else "")
     buttons = [[("⏹ End interview", "mockend:")]] if mock_active(sheet) else None
-    actions = re.findall(r"\[\[(PENDING_JOBS|WAITING_CVS)\]\]", answer)
-    answer = re.sub(r"\s*\[\[(PENDING_JOBS|WAITING_CVS)\]\]", "", answer).strip()
-    acts = re.findall(r"\[\[ACT:(applied|closed|skip|approve|card):([\w-]+)\]\]", answer)
+    actions = re.findall(r"\[\[(PENDING_JOBS|WAITING_CVS|MAIL_NOW|ADD_JOB_CV|ADD_JOB)\]\]", answer)
+    answer = re.sub(r"\s*\[\[(PENDING_JOBS|WAITING_CVS|MAIL_NOW|ADD_JOB_CV|ADD_JOB)\]\]", "", answer).strip()
+    acts = re.findall(r"\[\[ACT:(applied|closed|skip|approve|card|fix|cover|prep):([\w-]+)\]\]", answer)
     answer = re.sub(r"\s*\[\[ACT:[^\]]*\]\]", "", answer).strip()
     act_rows, cards = _act_buttons(sheet, acts)
+    if "MAIL_NOW" in actions:
+        act_rows.append([("📧 Check mail now", "mailnow:")])
+    if {"ADD_JOB", "ADD_JOB_CV"} & set(actions):
+        from agent.bot import queue_task
+        queue_task(sheet, "intake", "", "", {"text": text[:6000], "urls": [],
+                                             **({"approve": True} if "ADD_JOB_CV" in actions else {})},
+                   f"intake-{task.get('Task ID') or now_iso()}")
+        sheet.flush()
     if act_rows:
         buttons = (buttons or []) + act_rows
     if answer:

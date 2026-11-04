@@ -67,6 +67,7 @@ def test_scout_watches_boards_and_suggests(sheet, sent, monkeypatch):
         return [Job("greenhouse", "greenhouse:novadata:1", "Nova Data", "Junior Data Engineer", "Manchester, United Kingdom",
                     "https://x/1"), Job("greenhouse", "greenhouse:novadata:2", "Nova Data", "Engineer", "Berlin", "u")]
     monkeypatch.setattr(scout.ats, "FETCHERS", {"greenhouse": gh, "ashby": gh, "lever": gh})
+    monkeypatch.setattr(scout, "_page_boards", lambda careers: [])
     assert scout.run_task(sheet, {}, {}, print) == "2 new companies"
     rows = {r["Company"]: r for r in sheet.t("Boards").rows}
     assert (rows["Nova Data"]["Status"], rows["Nova Data"]["Board"]) == ("found", "novadata")
@@ -99,3 +100,106 @@ def test_two_postings_with_their_own_ids_are_both_sent(sheet):
     assert sent.before("NVIDIA", "Firmware Engineer", "workday:nvidia:JR2") == ""
     assert sent.before("NVIDIA", "Firmware Engineer", "workday:nvidia:JR1")
     assert sent.before("NVIDIA", "Firmware Engineer", "")                 # LinkedIn copy of it
+
+
+def test_scout_reads_the_board_a_careers_page_links_to(sheet, monkeypatch):
+    html = ('<a href="https://www.comeet.com/jobs/smart-shooter/0B.00A">Jobs</a>'
+            '<iframe src="https://paloaltonetworks.wd5.myworkdayjobs.com/en-US/panwexternalcareers"></iframe>')
+
+    from agent.sources import detect
+
+    class R:
+        text = html
+    monkeypatch.setattr(detect.requests, "get", lambda *a, **k: R())
+    monkeypatch.setattr(detect, "allowed", lambda url: True)
+    assert scout._page_boards("https://x.co/careers") == [("comeet", "smart-shooter/0B.00A"),
+                                                          ("workday", "paloaltonetworks.wd5/paloaltonetworks/panwexternalcareers")]
+    local = [Job("workday", "workday:b:1", "Initech", "Software Engineer", "London, United Kingdom", "u")]
+    monkeypatch.setattr(scout, "_fetchers", lambda: {"workday": lambda c: local, "comeet": lambda c: [],
+                                                     "greenhouse": lambda c: [], "ashby": lambda c: [], "lever": lambda c: []})
+    sheet.t("Boards").append({"Company": "Initech", "Status": "suggested", "Careers": "https://x.co/careers",
+                              "Checked": "2026-10-01 10:00:00+03:00"})
+    sheet.t("Boards").append({"Company": "Fresh Co", "Status": "suggested", "Careers": "https://y.co/careers",
+                              "Checked": scout.now_iso()})              # checked today: not again yet
+    assert scout.recheck_pages(sheet) == 1
+    rows = {r["Company"]: r for r in sheet.t("Boards").rows}
+    assert (rows["Initech"]["Status"], rows["Initech"]["ATS"]) == ("found", "workday")
+    assert rows["Fresh Co"]["Status"] == "suggested"
+
+
+def test_a_comeet_widget_on_the_company_site_gives_its_board(monkeypatch):
+    from agent.sources import detect
+    page = 'var comeetvar = {"comeet_token":"45715B315B38AE22B8D051A0A457D051E61","comeet_uid":"54.007"};'
+
+    class R:
+        ok = True
+        text = page
+
+        @staticmethod
+        def json():
+            return [{"url_comeet_hosted_page": "https://www.comeet.com/jobs/silverfort/54.007/full-stack/84.F60"}]
+    monkeypatch.setattr(detect.requests, "get", lambda *a, **k: R())
+    monkeypatch.setattr(detect, "allowed", lambda url: True)
+    monkeypatch.setattr(detect, "render", lambda url: "")
+    assert detect.boards_on_page("https://www.silverfort.com/careers/") == [("comeet", "silverfort/54.007")]
+
+
+def test_the_page_is_opened_in_a_browser_only_when_the_plain_page_shows_no_board(monkeypatch):
+    from agent.sources import detect
+
+    class R:
+        text = "<div id=app></div>"
+    monkeypatch.setattr(detect.requests, "get", lambda *a, **k: R())
+    monkeypatch.setattr(detect, "allowed", lambda url: True)
+    monkeypatch.setattr(detect, "render", lambda url: '<a href="https://apply.workable.com/globex/">Jobs</a>')
+    assert detect.boards_on_page("https://globex.example/careers") == [("workable", "globex")]
+    assert detect.board_links('<a href="https://jobs.smartrecruiters.com/Acme2/744">x</a>') == [("smartrecruiters", "Acme2")]
+    assert detect.board_links('<a href="https://jobs.eu.lever.co/hooli/e3">x</a>') == [("lever", "eu/hooli")]
+    assert detect.board_links('src="https://www.comeet.co/jobs/A5.007/DA.810" href="https://www.comeet.com/jobs/umbrella/A5.007"') \
+        == [("comeet", "umbrella/A5.007")]
+
+
+def test_new_readers_parse_local_jobs(monkeypatch):
+    from agent.sources import ats
+
+    class R:
+        status_code, ok = 200, True
+
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.data
+    wk = {"jobs": [{"title": "Backend Engineer", "shortcode": "AB12", "url": "https://apply.workable.com/j/AB12",
+                    "published_on": "2026-11-01", "description": "<p>Python</p>",
+                    "locations": [{"country": "United Kingdom", "countryCode": "GB", "city": "London"}]}]}
+    monkeypatch.setattr(ats.requests, "get", lambda *a, **k: R(wk))
+    (j,) = ats.workable({"name": "Globex", "board": "globex"})
+    assert (j.country, j.source_ref, j.description) == ("GB", "workable:globex:AB12", "Python")
+    rc = {"offers": [{"id": 7, "title": "Data Engineer", "country_code": "GB", "location": "London, United Kingdom",
+                      "careers_url": "https://vandelay.recruitee.com/o/data", "description": "<p>SQL</p>", "requirements": ""}]}
+    monkeypatch.setattr(ats.requests, "get", lambda *a, **k: R(rc))
+    (j,) = ats.recruitee({"name": "Vandelay", "board": "vandelay"})
+    assert (j.country, j.source_ref, j.url) == ("GB", "recruitee:vandelay:7", "https://vandelay.recruitee.com/o/data")
+    sr_list = {"totalFound": 1, "content": [{"id": "99", "name": "ML Engineer", "releasedDate": "2026-11-03T12:00:00Z",
+                                             "location": {"city": "London", "country": "gb", "fullLocation": "London, United Kingdom"}}]}
+    sr_ad = {"postingUrl": "https://jobs.smartrecruiters.com/Acme2/99",
+             "jobAd": {"sections": {"jobDescription": {"title": "The job", "text": "<p>LLMs</p>"}}}}
+    monkeypatch.setattr(ats.requests, "get", lambda url, *a, **k: R(sr_ad if url.endswith("/99") else sr_list))
+    (j,) = ats.smartrecruiters({"name": "Acme", "board": "Acme2"})
+    assert (j.country, j.url) == ("GB", "https://jobs.smartrecruiters.com/Acme2/99") and "LLMs" in j.description
+
+
+def test_a_careers_page_whose_robots_txt_says_no_is_never_read(monkeypatch):
+    from agent.sources import detect
+
+    class R:
+        status_code, text = 200, "User-agent: *\nDisallow: /careers"
+    asked = []
+    monkeypatch.setattr(detect.requests, "get", lambda url, **k: asked.append(url) or R())
+    monkeypatch.setattr(detect, "render", lambda url: (_ for _ in ()).throw(AssertionError("opened")))
+    assert detect.boards_on_page("https://acme.example/careers") == []
+    assert asked == ["https://acme.example/robots.txt"]

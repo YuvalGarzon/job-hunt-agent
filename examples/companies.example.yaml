@@ -4,14 +4,20 @@
 # near you (they go to the Sheet's Boards tab and are read every run too). Every source is
 # filtered to your country, so a global company only sends you its local openings.
 #
-#   ats: greenhouse | lever | comeet | ashby | workday | microsoft | amazon | google | apple
-#   board: the board ID (greenhouse/lever/ashby), or "slug/UID" for comeet
+#   ats: greenhouse | lever | comeet | ashby | workable | recruitee | smartrecruiters | workday |
+#        microsoft | amazon | google | apple
+#   board: the board ID (greenhouse/lever/ashby/workable/recruitee/smartrecruiters), "eu/<board>"
+#          for a Lever board in the EU, or "slug/UID" for comeet
 #   tier: 1 = large global tech, 2 = large regional tech, 3 = other (a small boost in the score)
 # To add a company, find its board on its careers page:
 #   greenhouse: boards.greenhouse.io/<board> or job-boards.greenhouse.io/<board>
 #   lever:      jobs.lever.co/<board>
 #   comeet:     comeet.com/jobs/<slug>/<UID>
 #   ashby:      jobs.ashbyhq.com/<board>
+#   workable:   apply.workable.com/<board>
+#   recruitee:  <board>.recruitee.com
+#   smartrecruiters: jobs.smartrecruiters.com/<board>
+# Or send the careers page link to the bot with /company and it finds the board itself.
 
 companies:
   # Greenhouse

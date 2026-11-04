@@ -21,13 +21,15 @@ class Job:
     workplace: str = ""       # on-site | hybrid | remote (when known)
     tier: int = 3
     extra: dict = field(default_factory=dict)
+    id_url: str = ""          # the link the job's ID was first made from, when the shown link changed since
 
     def __post_init__(self):
         self.url = clean_url(self.url)
+        self.id_url = clean_url(self.id_url)
 
     @property
     def job_id(self) -> str:
-        return job_id(self.company, self.title, self.url)
+        return job_id(self.company, self.title, self.id_url or self.url)
 
 
 def norm_text(s: str) -> str:

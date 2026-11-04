@@ -191,17 +191,20 @@ def collect(sheet: Sheet, fetched: list, known_companies: list, log=print) -> li
         after = sheet.kv_get("Health", key, "") or \
             str(int((datetime.now(config.tz()) - timedelta(days=FIRST_LOOKBACK_DAYS)).timestamp()))
         ids = gmail.search(f"from:{sender} after:{after}", limit=100)
-        newest, items, waiting, read = int(after), [], 0, 0
+        newest, items, waiting, read, handled = int(after), [], 0, 0, []
         ids = ids[::-1]                                  # oldest first
         for i, mid in enumerate(ids):
             m = gmail.message(mid)
             if m["received_ms"] // 1000 <= int(after):   # Gmail's after: includes the cursor's own second
                 continue
             read += 1
-            jobs = [] if ACCOUNT_MAIL.search(m.get("subject", "")) else parse(board, m)
+            account = bool(ACCOUNT_MAIL.search(m.get("subject", "")))
+            jobs = [] if account else parse(board, m)
             if jobs is None:                             # needs Claude: the computer reads it later
                 waiting = len(ids) - i
                 break
+            if not account:                              # a password or code email stays unread
+                handled.append(mid)
             newest = max(newest, m["received_ms"] // 1000)
             items += [(j, to_job(j, mid, m["received_ms"])) for j in jobs]
         items = list({job.job_id: (b, job) for b, job in items}.values())   # one email can list a job twice
@@ -214,6 +217,7 @@ def collect(sheet: Sheet, fetched: list, known_companies: list, log=print) -> li
                     save_post(j)
             out += found
         sheet.kv_set("Health", key, str(newest), flush=False)
+        gmail.mark_read(handled, log=log)                 # read by the agent: not left unread in the inbox
         if read:
             log(f"{board}: {read} emails, {len(items)} jobs, "
                 f"{sum(1 for j in out if j.source == board)} not on a company board"

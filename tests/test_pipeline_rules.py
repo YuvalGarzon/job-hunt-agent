@@ -108,8 +108,11 @@ def test_remote_jobs_follow_the_setting(monkeypatch):
 def test_recency():
     old = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
     new = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
-    assert filters.recency_check(mk(posted=old))
+    assert not filters.recency_check(mk(posted=old))       # still listed on the company's own board: open
     assert not filters.recency_check(mk(posted=new))
+    alert = Job(source="linkedin", source_ref="", company="Acme", title="Software Engineer", location="London",
+                url="https://www.linkedin.com/jobs/view/1/", posted=old)
+    assert filters.recency_check(alert)
 
 
 def test_scam_signs():
@@ -233,3 +236,23 @@ def test_remote_jobs_show_remote_on_the_card():
     row = {"Title": "Software Engineer", "Company": "Acme", "City": "", "Location": "Remote - UK",
            "Location flag": "location?", "Score": 66, "Source": "greenhouse", "URL": "https://x"}
     assert "📍 Remote" in alerts.job_text(row, 1)
+
+
+def test_jobs_dropped_only_for_their_date_on_a_company_board_are_looked_at_again():
+    from agent.pipeline import reconsider
+    rows = [{"Job ID": "a", "Decision": "dropped", "Reason": "posted 57 days ago", "Source": "ashby"},
+            {"Job ID": "b", "Decision": "dropped", "Reason": "posted 57 days ago", "Source": "linkedin"},
+            {"Job ID": "c", "Decision": "dropped", "Reason": "senior title (Senior)", "Source": "ashby"},
+            {"Job ID": "d", "Decision": "alerted", "Reason": "", "Source": "workday"}]
+    assert set(reconsider(rows)) == {"a"}
+
+
+def test_an_old_posting_still_open_says_so_on_its_card():
+    from datetime import timedelta
+    from agent import alerts
+    row = {"Title": "Data Engineer", "Company": "Acme", "City": "London", "Location": "London", "Location flag": "",
+           "Score": "80", "Fit": "", "Gaps": "", "Source": "greenhouse", "URL": "u", "Reason": "",
+           "Posted": (datetime.now(timezone.utc) - timedelta(days=50)).date().isoformat()}
+    assert "still open on the company site" in alerts.job_text(row, 1)
+    row["Posted"] = (datetime.now(timezone.utc) - timedelta(days=3)).date().isoformat()
+    assert "still open" not in alerts.job_text(row, 1)

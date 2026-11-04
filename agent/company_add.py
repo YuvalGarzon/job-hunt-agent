@@ -5,7 +5,9 @@
     detect("Acme")                                 # a name: its public board is searched for
 
 The company's job system and board ID are read from the link (Greenhouse, Lever, Ashby,
-Comeet, Workday), or from the careers page itself when its robots.txt allows reading it, or
+Comeet, Workday, Workable, Recruitee, SmartRecruiters), or from the careers page itself when its
+robots.txt allows reading it (agent/sources/detect.py, in a headless browser when the page loads
+its jobs with JavaScript), or
 guessed from the name and accepted only when that board answers. The board is then read once
 to count its open jobs and the ones in the user's country. LinkedIn and job-board sites are
 never opened (rule 4).
@@ -59,7 +61,7 @@ def _page(url: str) -> str:
 
 def _name_from(url: str, kind: str, board: str) -> str:
     host = urlsplit(url).netloc.lower().removeprefix("www.")
-    if host and not re.search(r"greenhouse|lever|ashbyhq|comeet|myworkdayjobs", host):
+    if host and not re.search(r"greenhouse|lever|ashbyhq|comeet|myworkdayjobs|workable|recruitee|smartrecruiters", host):
         parts = host.split(".")
         second_level = len(parts) >= 3 and len(parts[-1]) == 2 and parts[-2] in ("co", "com", "org", "net")
         return parts[-3 if second_level else -2].replace("-", " ").title()
@@ -87,7 +89,9 @@ def detect(query: str) -> tuple:
     if re.match(r"https?://", q):
         if NEVER_OPEN.search(q):
             return None, "I don't open LinkedIn or job-board sites. Send the company's own careers page."
-        tries = boards_in(q) or boards_in(_page(q))
+        from agent.sources import detect as pages
+        tries = (list(dict.fromkeys(boards_in(q) + pages.board_links(q))) or boards_in(_page(q))
+                 or pages.boards_on_page(q))          # the page as a browser shows it, a Comeet widget
         if not tries:
             return None, ("I couldn't find a job board on that page (it may use a system the agent can't read, "
                           "or not allow automatic reading). Try the company's name instead.")
@@ -104,7 +108,7 @@ def detect(query: str) -> tuple:
             if hit and hit["jobs"]:
                 return hit, ""
     return None, (f"I couldn't find a public job board for {q}. Send its careers page link: the agent reads "
-                  "Greenhouse, Lever, Ashby, Comeet and Workday boards.")
+                  "Greenhouse, Lever, Ashby, Comeet, Workday, Workable, Recruitee and SmartRecruiters boards.")
 
 
 def known(company: dict, names: list) -> bool:

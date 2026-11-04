@@ -25,6 +25,7 @@ from agent.claude_cli import ask, extract_block
 
 MAX_FIX_ROUNDS = 4
 LEAD_MAX = 105                  # the bold opening line: one line on the page
+TRIM_MAX_LINES = 2              # this many lines over one page: the code cuts them, no model call
 
 ROLE_RULES = [
     (r"computer vision|\bcv\b|perception|image processing|imaging|vision", "Computer Vision Engineer"),
@@ -285,6 +286,27 @@ def _render(content_path: Path, pdf_path: Path) -> tuple:
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+def overflow_lines(pdf_path: Path) -> int:
+    """How many text lines spilled past the first page."""
+    import pymupdf
+    doc = pymupdf.open(pdf_path)
+    return sum(len({round(w[1]) for w in page.get_text("words")}) for page in doc.pages(1))
+
+
+def trim_cut(content: dict) -> str:
+    """Make one small cut for a CV a line or two too long, in the length rule's order; '' when
+    nothing is left to cut without going below the minimums (Also built 1, second project 2 bullets)."""
+    also = content.get("also_built") or []
+    if len(also) > 1:
+        also.pop()
+        return "dropped the last Also built line"
+    bullets = (content.get("second_project") or {}).get("bullets") or []
+    if len(bullets) > 2:
+        bullets.pop()
+        return "dropped the last second-project bullet"
+    return ""
+
+
 def visual_check(pdf_path: Path, content: dict, png_path: Path = None) -> list:
     """Rasterize and inspect: one page, all text inside the printable area, every line present."""
     import pymupdf
@@ -411,6 +433,14 @@ def build(job: dict, out_dir: Path = None, feedback: str = None, previous_conten
             content_path.write_text(yaml.safe_dump(content, allow_unicode=True, sort_keys=False, width=1000),
                                     encoding="utf-8")
             code, out = _render(content_path, pdf_path)
+            while code == 2 and overflow_lines(pdf_path) <= TRIM_MAX_LINES:
+                cut = trim_cut(content)
+                if not cut:
+                    break
+                log(f"render round {round_no}: a line or two over one page, {cut}")
+                content_path.write_text(yaml.safe_dump(content, allow_unicode=True, sort_keys=False, width=1000),
+                                        encoding="utf-8")
+                code, out = _render(content_path, pdf_path)
             log(f"render round {round_no}: exit {code}")
             if code == 0:
                 problems = visual_check(pdf_path, content, work / "preview.png")
@@ -426,7 +456,9 @@ def build(job: dict, out_dir: Path = None, feedback: str = None, previous_conten
                     problems = better + ["Keep everything else and keep it to one page."]
             elif code == 2:
                 stage = "length"
-                problems = ["The PDF is longer than one page. Shorten in this order: tighter wording "
+                over = overflow_lines(pdf_path)
+                problems = [f"The PDF is {over} line{'s' if over != 1 else ''} longer than one page: cut at least that much. "
+                            "Shorten in this order: tighter wording "
                             "(summary, long bullets), then Also built down to its single most relevant "
                             "line, then fewer second-project bullets (minimum 2), then fewer main-project "
                             "bullets (minimum 3), then drop the last Also built line. Never change the design."]

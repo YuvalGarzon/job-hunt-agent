@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from agent import bot
 from agent.truth_check import check_text
@@ -231,3 +232,104 @@ def test_skipped_lists_cancelled_cvs_with_resume(sheet, monkeypatch):
     sheet.flush()
     bot.handle(sheet, msg(90, "/skipped"), by="mac", mac_online=True)
     assert any(b and b[0][0][1] == "cvres:A7" for t, b in calls)
+
+
+def test_chat_without_a_reply_is_about_the_last_job_sent(monkeypatch, sheet, sent):
+    from agent import claude_cli, tasks, writing
+    monkeypatch.setattr(writing, "CHAT_LOG", Path("/nonexistent/chat.jsonl"))
+    asked = []
+    monkeypatch.setattr(claude_cli, "ask", lambda prompt, **k: asked.append(prompt) or "Yes, TypeScript is in the requirements.")
+    monkeypatch.setattr(tasks, "_job_from_sheet", lambda s, job_id: {"description": f"Requirements for {job_id}: TypeScript"})
+    monkeypatch.setattr(writing, "_log_turn", lambda *a: None)
+    job = sheet.t("Jobs").rows[0]
+    job["Alert msg ID"] = 1900
+    sheet.t("Queue").append({"Task ID": "cv-A1", "Type": "build_cv", "Job ID": job["Job ID"], "Status": "done",
+                             "Result": '{"sent_msg": 1951, "pdf": "x.pdf"}'})
+    assert writing.last_sent_job(sheet) == job["Job ID"]
+    writing.chat(sheet, {}, {"text": "Does the job ask for TypeScript?"}, print)
+    assert f"job id {job['Job ID']}" in asked[0] and f"Requirements for {job['Job ID']}: TypeScript" in asked[0]
+
+
+def _chat_prompt(monkeypatch, sheet, text, payload_extra=None, log=None):
+    from agent import claude_cli, tasks, writing
+    asked = []
+    monkeypatch.setattr(claude_cli, "ask", lambda prompt, **k: asked.append(prompt) or "OK.")
+    monkeypatch.setattr(tasks, "_job_from_sheet", lambda s, job_id: {"description": f"posting of {job_id}"})
+    if log:
+        monkeypatch.setattr(writing, "CHAT_LOG", log)
+    else:
+        monkeypatch.setattr(writing, "_log_turn", lambda *a: None)
+        monkeypatch.setattr(writing, "CHAT_LOG", Path("/nonexistent/chat.jsonl"))
+    writing.chat(sheet, {}, {"text": text, **(payload_extra or {})}, print)
+    return asked[0]
+
+
+def test_chat_reply_says_whether_he_applied_and_knows_the_sheet(monkeypatch, sheet, sent):
+    job = sheet.t("Jobs").rows[0]
+    prompt = _chat_prompt(monkeypatch, sheet, "Did I apply to this job?", {"job_id": job["Job ID"]})
+    assert f"job id {job['Job ID']}" in prompt and "NONE, not applied" in prompt
+    assert "means THIS one" in prompt and "never say you cannot see it" in prompt
+
+
+def test_chat_finds_the_job_of_a_pasted_posting(monkeypatch, sheet, sent):
+    job = sheet.t("Jobs").rows[0]
+    job["Title"], job["Company"] = "Software Solution Architect, NVIS", "NVIDIA"
+    prompt = _chat_prompt(monkeypatch, sheet, "Software Solution Architect, NVIS\nApply\nAs a Software Solution "
+                                              "Architect, NVIS at NVIDIA, you will lead...")
+    assert f"job id {job['Job ID']}" in prompt and "contains this job's posting" in prompt
+
+
+def test_chat_follow_up_stays_on_the_job_just_discussed(monkeypatch, sheet, sent, tmp_path):
+    from agent import writing
+    first = sheet.t("Jobs").rows[0]
+    sheet.t("Jobs").append({**first, "Job ID": "0ther0job000", "Title": "Another Engineer",
+                            "Alert msg ID": 1999})     # a newer card was sent meanwhile
+    log = tmp_path / "chat.jsonl"
+    _chat_prompt(monkeypatch, sheet, "Did I apply to this job?", {"job_id": first["Job ID"]}, log=log)
+    assert writing._recent_chat_job() == first["Job ID"]
+    from agent import claude_cli
+    asked = []
+    monkeypatch.setattr(claude_cli, "ask", lambda prompt, **k: asked.append(prompt) or "OK.")
+    writing.chat(sheet, {}, {"text": "Check the sheet"}, print)
+    assert f"job id {first['Job ID']}" in asked[0] and "a follow-up is still about it" in asked[0]
+
+
+def test_chat_new_tokens_give_buttons_and_add_a_pasted_job(monkeypatch, sheet, sent):
+    from agent import claude_cli, telegram as tg, writing
+    job = sheet.t("Jobs").rows[0]
+    _app(sheet)
+    sheet.t("Applications").rows[-1]["Job ID"] = job["Job ID"]
+    calls = []
+    monkeypatch.setattr(tg, "send_message", lambda text, buttons=None, **k: calls.append((text, buttons)) or {"message_id": 9})
+    monkeypatch.setattr(tg, "send_chat_action", lambda *a, **k: None)
+    monkeypatch.setattr(writing, "_log_turn", lambda *a: None)
+    monkeypatch.setattr(writing, "_posting", lambda s, j: "")
+    monkeypatch.setattr(claude_cli, "ask", lambda prompt, **k: f"Tap the button. [[ACT:fix:{job['Job ID']}]] "
+                        f"[[ACT:cover:{job['Job ID']}]] [[ACT:prep:{job['Job ID']}]] [[MAIL_NOW]] [[ADD_JOB_CV]]")
+    writing.chat(sheet, {"Task ID": "chat-7"}, {"text": "Backend Engineer at Foo, requirements: Python " * 10}, print)
+    text, buttons = calls[-1]
+    assert "[[" not in text
+    data = [b[1] for row in buttons for b in row]
+    assert data == ["fix:A1", "cl:A1", f"prep:{job['Company'][:40]}", "mailnow:"]
+    intake = [t for t in sheet.t("Queue").rows if t["Type"] == "intake"]
+    assert len(intake) == 1 and json.loads(intake[0]["Payload"])["approve"] is True
+
+
+def test_chat_fix_without_a_cv_shows_no_button(monkeypatch, sheet, sent):
+    from agent import writing
+    job = sheet.t("Jobs").rows[0]
+    rows, cards = writing._act_buttons(sheet, [("fix", job["Job ID"]), ("cover", job["Job ID"])])
+    assert rows == [] and cards == []
+
+
+def test_chat_knows_a_cv_still_being_built_is_not_ready(monkeypatch, sheet, sent):
+    from agent import bot as b
+    job = sheet.t("Jobs").rows[0]
+    b.handle(sheet, cb(f"ap:{job['Job ID']}"), by="mac", mac_online=True)      # approve: CV build queued
+    prompt = _chat_prompt(monkeypatch, sheet, "Where is the CV?", {"job_id": job["Job ID"]})
+    assert "BEING BUILT RIGHT NOW" in prompt and "CV being built now" in prompt
+    task = next(t for t in sheet.t("Queue").rows if t["Type"] == "build_cv")
+    sheet.t("Queue").update(task, Status="done")
+    sheet.t("Applications").update(sheet.t("Applications").rows[0], **{"CV path": "CVs/x/Alex Morgan CV.pdf"})
+    prompt = _chat_prompt(monkeypatch, sheet, "Where is the CV?", {"job_id": job["Job ID"]})
+    assert "already sent in this chat" in prompt and "BEING BUILT" not in prompt

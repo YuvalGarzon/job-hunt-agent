@@ -11,11 +11,12 @@ before you ever see it.
 ## What it does
 
 - **Finds jobs.** Every 15 minutes it reads the public job boards of the companies you watch
-  (Greenhouse, Lever, Ashby, Comeet, Workday, and the career sites of Microsoft, Amazon,
-  Google and Apple), plus your LinkedIn and other job-alert emails in Gmail. Every day it asks
-  Claude to find more companies near you.
+  (Greenhouse, Lever, Ashby, Comeet, Workday, Workable, Recruitee, SmartRecruiters, and the
+  career sites of Microsoft, Amazon, Google and Apple), plus your LinkedIn and other job-alert
+  emails in Gmail. Every day it asks Claude to find more companies near you, and finds the job
+  board each one's careers page uses. Each card links to the job's own page.
 - **Filters and scores them.** It drops jobs that are too senior, too far from home, not the
-  type you want, old, or look like scams, and gives the rest a 0-100 fit score against your
+  type you want, or look like scams, and gives the rest a 0-100 fit score against your
   profile. Every decision has a written reason.
 - **Sends you the good ones on Telegram**, best first, each as a card with ✅ Approve / ⏭ Skip.
   Skips teach it: skip for "company" and that company is gone; skip for "location" and that
@@ -168,11 +169,15 @@ In the same Google Cloud project:
    address as a *Test user*.
 3. **Credentials › Create credentials › OAuth client ID › Desktop app**, and download the JSON
    to `~/Downloads`.
-4. The wizard runs `scripts/gmail_auth.py`: a browser opens, you sign in and allow read and
-   send access.
+4. The wizard runs `scripts/gmail_auth.py`: a browser opens, you sign in and allow read,
+   send and modify access.
 
 The agent reads your mail only to find job alerts and replies from companies you applied to,
-and it can only send email to your own address. While the OAuth app is in *Testing*, Google
+and it can only send email to your own address. The modify access is used for one thing: the
+job-alert emails it has read are marked as read, so unread alerts in your inbox don't look like
+jobs you missed. It never deletes, moves or archives mail. If you signed in before this was
+added, run `python scripts/gmail_auth.py` once more; until then the emails stay unread and
+everything else works. While the OAuth app is in *Testing*, Google
 ends the sign-in after 7 days; the agent reminds you on Telegram to run
 `python scripts/gmail_auth.py` again. To stop that, publish the app (**OAuth consent
 screen › Publish app**) and sign in once with `scripts/gmail_auth.py --production`.
@@ -183,16 +188,20 @@ screen › Publish app**) and sign in once with `scripts/gmail_auth.py --product
 
 Paste a company's careers page link (or just its name) into the wizard, or send it to the bot
 later with `/company <link or name>`. The agent finds which job system the company uses
-(Greenhouse, Lever, Ashby, Comeet or Workday), reads its board once, and tells you how many
+(Greenhouse, Lever, Ashby, Comeet, Workday, Workable, Recruitee or SmartRecruiters), reads its
+board once, and tells you how many
 open jobs it has in your country; from then on it is read every run.
 
 - A board link works best: `https://boards.greenhouse.io/<company>`, `https://jobs.lever.co/<company>`,
   `https://jobs.ashbyhq.com/<company>`, `https://<company>.wd5.myworkdayjobs.com/<site>`.
-- A company's own careers page works when the page shows its job board and allows automatic reading.
+- A company's own careers page works when it links to or embeds its job board and its robots.txt
+  allows automatic reading. Pages that load their jobs with JavaScript are opened once in headless
+  Chrome or Chromium, when one is installed.
 - A name works when the company's board uses its name (e.g. "Datadog").
 - Microsoft, Amazon, Google and Apple are read through their own career sites (in the starter list).
 - A company on another job system can't be watched directly; its jobs can still reach you
-  through LinkedIn or job-board alert emails.
+  through LinkedIn or job-board alert emails. Companies the scout finds but can't read yet are
+  checked again every two weeks.
 
 You can also edit `companies.yaml` by hand (its top explains the format). Every day at 11:00
 the agent's company scout suggests more companies near you on Telegram.
