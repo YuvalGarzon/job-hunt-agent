@@ -35,7 +35,7 @@ class Job:
 def norm_text(s: str) -> str:
     s = (s or "").lower().strip()
     s = re.sub(r"[‐-―]", "-", s)
-    s = re.sub(r"[^\w֐-׿+#./ -]", " ", s)
+    s = re.sub(r"[^\w+#./ -]", " ", s)        # \w keeps letters of every language
     return re.sub(r"\s+", " ", s).strip()
 
 
