@@ -1,5 +1,9 @@
 # Job Hunt Agent
 
+[![tests](https://github.com/YuvalGarzon/job-hunt-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/YuvalGarzon/job-hunt-agent/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+
 A personal job-search agent that runs on your own computer (macOS, Windows or Linux). It watches company career pages and your
 job-alert emails, sends you the jobs that fit you on Telegram, and builds a one-page CV
 tailored to each job you approve: written only from facts you gave it, checked by code
