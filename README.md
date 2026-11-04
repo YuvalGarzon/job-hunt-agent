@@ -1,6 +1,7 @@
 # Job Hunt Agent
 
 [![tests](https://github.com/YuvalGarzon/job-hunt-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/YuvalGarzon/job-hunt-agent/actions/workflows/tests.yml)
+[![release](https://img.shields.io/github/v/release/YuvalGarzon/job-hunt-agent)](https://github.com/YuvalGarzon/job-hunt-agent/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
