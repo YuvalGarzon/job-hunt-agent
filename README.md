@@ -5,8 +5,12 @@ job-alert emails, sends you the jobs that fit you on Telegram, and builds a one-
 tailored to each job you approve: written only from facts you gave it, checked by code
 before you ever see it.
 
-<p align="center"><img src="examples/sample-cv.png" width="520" alt="A tailored CV the agent built for the example person"></p>
-<p align="center"><sub>A CV the agent tailored for a made-up person, Alex Morgan, to a "Junior Machine Learning Engineer" posting.</sub></p>
+<p align="center">
+  <img src="examples/telegram-chat.png" width="273" alt="Job cards on Telegram with Approve and Skip buttons, and the tailored CV the agent sent after Approve">
+  &nbsp;
+  <img src="examples/sample-cv.png" width="397" alt="A tailored CV the agent built for the example person">
+</p>
+<p align="center"><sub>Left: job cards on Telegram, and the CV sent after ✅ Approve. Right: that CV, tailored for a made-up person, Alex Morgan, to a "Junior Machine Learning Engineer" posting.</sub></p>
 
 ## What it does
 
