@@ -20,9 +20,9 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(sources, "fetch_one", lambda ref: {"title": "Data Engineer", "description": "Python, SQL", "url": "https://x"})
     calls = []
 
-    def fake_build(job, out_dir=None, feedback=None, previous_content=None, log=print):
+    def fake_build(job, out_dir=None, feedback=None, previous_content=None, failed=None, log=print):
         assert isinstance(job, dict) and job["company"] == "Acme" and job["description"]
-        calls.append({"out_dir": out_dir, "feedback": feedback})
+        calls.append({"out_dir": out_dir, "feedback": feedback, "previous": previous_content, "failed": failed})
         pdf = config.ROOT / "CVs" / "_test" / config.cv_file_name()
         return {"pdf": pdf, "content": pdf.with_name("content.yaml"), "dir": pdf.parent, "fit": "fits",
                 "gaps": ["Kafka"], "preview": None, "flags": {}}
@@ -76,6 +76,26 @@ def test_failure_backs_off(env, monkeypatch):
     q = s.t("Queue").rows[0]
     assert q["Status"] == "pending" and "retry_at" in q["Payload"]
     assert tasks.run_one(s) is False            # not retried before its time
+
+
+def test_cv_out_of_rounds_goes_on_at_once_from_its_last_version(env, monkeypatch, tmp_path):
+    s, sent, calls = env
+    real = cv_builder.build
+    last = tmp_path / "last_try.yaml"
+    last.write_text("summary: x\n")
+
+    def once(*a, **k):
+        monkeypatch.setattr(cv_builder, "build", real)
+        raise cv_builder.CVBuildError("out of rounds", last=last, problems=["1 line longer than one page"])
+    monkeypatch.setattr(cv_builder, "build", once)
+    bot.handle(s, cb("ap:abc123def456"), by="mac", mac_online=True)
+    tasks.run_one(s)
+    q = s.t("Queue").rows[0]
+    assert q["Status"] == "pending" and "retry_at" not in q["Payload"] and "resume" in q["Payload"]
+    assert not any("failed" in m for m in sent["msgs"])
+    assert tasks.run_one(s) is True              # no wait
+    assert calls[-1]["previous"] == last and calls[-1]["failed"] == ["1 line longer than one page"]
+    assert len(sent["docs"]) == 1 and s.t("Queue").rows[0]["Status"] == "done"
 
 
 def test_resume_sends_already_built_pdf_without_rebuilding(env, monkeypatch, tmp_path):

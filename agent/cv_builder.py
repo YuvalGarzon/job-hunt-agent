@@ -44,7 +44,9 @@ ROLE_RULES = [
 
 
 class CVBuildError(RuntimeError):
-    pass
+    def __init__(self, msg: str, last: Path = None, problems: list = None):
+        super().__init__(msg)
+        self.last, self.problems = last, problems or []       # the last version and what was wrong with it
 
 
 class LinkCheckPending(CVBuildError):
@@ -294,8 +296,9 @@ def overflow_lines(pdf_path: Path) -> int:
 
 
 def trim_cut(content: dict) -> str:
-    """Make one small cut for a CV a line or two too long, in the length rule's order; '' when
-    nothing is left to cut without going below the minimums (Also built 1, second project 2 bullets)."""
+    """Make one small cut for a CV a line or two too long, in the length rule's order (Also built
+    down to 1, second project down to 2 bullets, main project down to 3, then no Also built);
+    '' when nothing is left to cut."""
     also = content.get("also_built") or []
     if len(also) > 1:
         also.pop()
@@ -304,6 +307,13 @@ def trim_cut(content: dict) -> str:
     if len(bullets) > 2:
         bullets.pop()
         return "dropped the last second-project bullet"
+    main = (content.get("main_project") or {}).get("bullets") or []
+    if len(main) > 3:
+        main.pop()
+        return "dropped the last main-project bullet"
+    if also:
+        also.pop()
+        return "dropped the Also built line"
     return ""
 
 
@@ -381,8 +391,10 @@ def improvements(job: dict, content: dict, keywords: list = ()) -> list:
 
 
 def build(job: dict, out_dir: Path = None, feedback: str = None, previous_content: Path = None,
-          log=print) -> dict:
-    """Build the tailored CV for one job. Returns {pdf, content, dir, fit, gaps, preview}."""
+          failed: list = None, log=print) -> dict:
+    """Build the tailored CV for one job. Returns {pdf, content, dir, fit, gaps, preview}.
+    failed: the problems of previous_content, the last version of an earlier build that ran out
+    of rounds; the build goes on from that version instead of starting over."""
     flags = job_flags(job)
     out_dir = out_dir or job_dir(job)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -395,6 +407,10 @@ def build(job: dict, out_dir: Path = None, feedback: str = None, previous_conten
     if feedback:
         extra = ("THE USER'S REQUEST FOR THIS VERSION (apply it only as far as the rules allow; if it "
                  f"asks for something not in the profile, do not add it and say so under gaps):\n{feedback}")
+    if failed and previous:
+        extra += ("\n\n" if extra else "") + ("This content failed these checks. Return the corrected full "
+                                              "content (same two blocks). Fix only what is listed:\n- "
+                                              + "\n- ".join(failed))
     answer = ask(_prompt(job, flags, extra, previous), system=system_prompt())
     content, fit, gaps, match, notes = _parse(answer)
     keywords = notes["keywords"]
@@ -477,7 +493,10 @@ def build(job: dict, out_dir: Path = None, feedback: str = None, previous_conten
             visual_check(pdf_path, content, work / "preview.png")
             break
         if round_no == MAX_FIX_ROUNDS:
-            raise CVBuildError(f"could not produce a valid CV after {MAX_FIX_ROUNDS} rounds: {problems}")
+            last = work / "last_try.yaml"
+            last.write_text(yaml.safe_dump(content, allow_unicode=True, sort_keys=False, width=1000), encoding="utf-8")
+            raise CVBuildError(f"could not produce a valid CV after {MAX_FIX_ROUNDS} rounds: {problems}",
+                               last=last, problems=problems)
         fix = ("Your CV content failed these checks. Return the corrected full content (same two "
                "blocks). Fix only what is listed:\n- " + "\n- ".join(problems))
         answer = ask(_prompt(job, flags, fix, yaml.safe_dump(content, allow_unicode=True, sort_keys=False, width=1000)),

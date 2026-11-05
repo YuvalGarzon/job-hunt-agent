@@ -114,10 +114,20 @@ def workday(company: dict) -> list:
     return out
 
 
+def _wd_removed(r) -> bool:
+    """Workday answers a posting the company took down with 403 and error code S22."""
+    if r.status_code != 403:
+        return False
+    try:
+        return r.json().get("errorCode") == "S22"
+    except ValueError:
+        return False
+
+
 def _wd_info(board: str, path: str) -> dict:
     _, api, _ = _wd_parts(board)
     r = requests.get(f"{api}{path}", headers={**UA, "Accept": "application/json"}, timeout=TIMEOUT)
-    if r.status_code in (404, 410):
+    if r.status_code in (404, 410) or _wd_removed(r):
         return None
     r.raise_for_status()
     info = r.json().get("jobPostingInfo") or {}

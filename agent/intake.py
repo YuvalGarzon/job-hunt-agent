@@ -408,6 +408,15 @@ def run_task(sheet: Sheet, task: dict, payload: dict, log) -> str:
     if payload.get("for_job"):
         return attach_posting(sheet, payload["for_job"], text, log)
     jobs = collect(text, urls, sheet)
+    if not jobs and payload.get("media") and done.get("media_text"):
+        # a screenshot that is not a job (an application form, an email, a question): the chat
+        # answers it, with the user's words and the image's text
+        from agent import writing
+        said = payload.get("text", "").strip()
+        writing.chat(sheet, task, {"text": (f"{said}\n\n" if said else "") +
+                                   f"[THE IMAGE THE USER SENT, as the agent read it:]\n{done['media_text'][:4000]}",
+                                   "job_id": payload.get("job_id", "")}, log)
+        return "no job: answered in the chat"
     if not jobs:
         if payload.get("media") and not done.get("media_text"):
             tg.send_message("🤔 I couldn't read any text in the image/file. Try a sharper screenshot, "
@@ -420,6 +429,10 @@ def run_task(sheet: Sheet, task: dict, payload: dict, log) -> str:
                             "automatic reading. Send a screenshot or the job's text and I'll check it from that.")
         return "no job"
     sent = done.get("sent", {})
+    if payload.get("media") and not sent:                     # now it is known to be a job
+        names = "\n".join(f"• {tg.esc(j.title)} · {tg.esc(j.company)}" for j in jobs)
+        tg.send_message(f"💼 It's a job:\n{names}\nChecking it…" if len(jobs) == 1
+                        else f"💼 I found {len(jobs)} jobs:\n{names}\nChecking them…")
     q = sheet.t("Queue")
     for n, job in enumerate(jobs, 1):
         if job.job_id in sent:                                 # resumed task: never send twice

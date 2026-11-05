@@ -83,6 +83,21 @@ def run_one(sheet: Sheet, log=print) -> bool:
         if attempts == 1:
             tg.send_message("⏳ I couldn't verify the GitHub links on the CV (GitHub is not reachable). "
                             "I don't send a CV without checking. I'll try again in 30 minutes.")
+    except cv_builder.CVBuildError as e:
+        # the CV did not pass its checks in time: go on at once from its last version (no wait,
+        # nothing is down); the last attempt fails like any other task
+        err = secrets.redact(f"{e.__class__.__name__}: {e}")[:500]
+        log(traceback.format_exc())
+        final = attempts >= MAX_ATTEMPTS
+        if not final and e.last:
+            payload["resume"] = {"content": str(e.last), "problems": e.problems}
+            payload.pop("retry_at", None)
+        elif not final:
+            payload["retry_at"] = (datetime.now(timezone.utc) + timedelta(minutes=2 ** attempts)).isoformat(timespec="seconds")
+        q.update(task, Status="failed" if final else "pending", Updated=now_iso(), Error=err,
+                 Payload=json.dumps(payload, ensure_ascii=False))
+        if final:
+            tg.send_message(f"❌ A task failed ({tg.esc(task['Type'])}): {tg.esc(err[:300])}")
     except Exception as e:
         err = secrets.redact(f"{e.__class__.__name__}: {e}")[:500]
         log(traceback.format_exc())
@@ -162,8 +177,15 @@ def build_cv(sheet: Sheet, task: dict, payload: dict, log) -> str:
         log(f"resuming {task['Task ID']}: PDF was already built, sending it")
     else:
         tg.send_chat_action("upload_document")
-        res = cv_builder.build(job, out_dir=out_dir, feedback=feedback,
-                               previous_content=previous if mode == "fix" and previous.exists() else None, log=log)
+        resume = payload.get("resume") or {}
+        last = Path(resume.get("content", ""))
+        if resume and last.is_file():
+            log(f"{task['Task ID']}: going on from the last version of the previous attempt")
+            res = cv_builder.build(job, out_dir=out_dir, feedback=feedback, previous_content=last,
+                                   failed=resume.get("problems") or [], log=log)
+        else:
+            res = cv_builder.build(job, out_dir=out_dir, feedback=feedback,
+                                   previous_content=previous if mode == "fix" and previous.exists() else None, log=log)
 
     gaps = ", ".join(res["gaps"]) if res["gaps"] else "none"
     label = {"new": "Tailored CV", "retry": "New version", "fix": "Fixed version",

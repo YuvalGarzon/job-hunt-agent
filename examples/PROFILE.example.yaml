@@ -159,4 +159,5 @@ writing_rules:
   never:
     - claim a tool, number or responsibility that is not in this file
     - say "student", "expected graduation" or "intern" about Alex
+    - write soft skills, personality traits or likes about Alex ("I enjoy", "team player", "fast learner"); describe only the work
   numbers: copy exactly as written here, rounding only as the fact itself says

@@ -116,3 +116,31 @@ def test_sources_ask_for_the_users_country():
     assert [q["location"] for q in bigco.g_queries()] == ["United Kingdom", "United Kingdom"]
     assert bigco._a_slug() == "united-kingdom-GBR" and bigco.a_base("en-gb").endswith("/en-gb")
     assert bigco._ms_country(["Manchester, ENG, GB"]) == "GB" and bigco._ms_country(["Berlin, BE, DE"]) == "DE"
+
+
+class _Resp:
+    def __init__(self, code, body):
+        self.status_code, self._body = code, body
+
+    def json(self):
+        if self._body is None:
+            raise ValueError("not json")
+        return self._body
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(self.status_code)
+
+
+@pytest.mark.parametrize("resp", [_Resp(404, None), _Resp(403, {"errorCode": "S22", "message": "permission denied"}),
+                                  _Resp(200, {"jobPostingInfo": {"title": "A", "posted": False}})])
+def test_workday_removed_posting_is_gone(monkeypatch, resp):
+    monkeypatch.setattr(bigco.requests, "get", lambda *a, **k: resp)
+    assert bigco.workday_one("x.wd1/x/Ext", "/job/Manchester/A_1") is None
+
+
+@pytest.mark.parametrize("resp", [_Resp(403, {"errorCode": "OTHER"}), _Resp(403, None), _Resp(500, None)])
+def test_workday_block_or_outage_is_not_gone(monkeypatch, resp):
+    monkeypatch.setattr(bigco.requests, "get", lambda *a, **k: resp)
+    with pytest.raises(RuntimeError):
+        bigco.workday_one("x.wd1/x/Ext", "/job/Manchester/A_1")

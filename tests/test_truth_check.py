@@ -282,7 +282,12 @@ def test_a_line_or_two_over_one_page_is_cut_by_the_code(tmp_path):
     assert cv_builder.trim_cut(cv) == "dropped the last Also built line" and len(cv["also_built"]) == 1
     assert cv_builder.trim_cut(cv) == "dropped the last second-project bullet"
     assert cv["second_project"]["bullets"] == ["one", "two"]
+    cv["main_project"]["bullets"] = ["m1", "m2", "m3", "m4"]
+    assert cv_builder.trim_cut(cv) == "dropped the last main-project bullet"
+    assert cv["main_project"]["bullets"] == ["m1", "m2", "m3"]
+    assert cv_builder.trim_cut(cv) == "dropped the Also built line" and cv["also_built"] == []
     assert cv_builder.trim_cut(cv) == ""                 # the minimums stay
+    assert len(cv["main_project"]["bullets"]) == 3 and len(cv["second_project"]["bullets"]) == 2
     doc = pymupdf.open()
     doc.new_page().insert_text((72, 72), "page one")
     doc.new_page().insert_text((72, 72), "spilled line one\nspilled line two")

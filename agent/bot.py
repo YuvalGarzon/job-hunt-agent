@@ -771,9 +771,15 @@ def on_job_post(sheet: Sheet, text: str, urls: list, update_id, ctx, media: list
                         + ("Saving it, updating the score and building a CV from it…" if ctx["mac_online"]
                            else "Your computer is off, I'll handle it when it's back."))
         return
+    # a photo or file may not be a job at all (a form, a question): say only that it is being
+    # read; the intake task says "checking the job" once it finds one
     what = "the image" if media and media[0]["mime"].startswith("image/") else "the file" if media else ""
-    tg.send_message((f"📥 Got it. Reading {what} and checking the job…" if what else "📥 Got it. Checking the job…")
-                    if ctx["mac_online"] else "📥 Got it. Your computer is off, I'll check the job when it's back.")
+    if what:
+        tg.send_message(f"📥 Got it. Reading {what}…" if ctx["mac_online"]
+                        else f"📥 Got it. Your computer is off, I'll read {what} when it's back.")
+    else:
+        tg.send_message("📥 Got it. Checking the job…" if ctx["mac_online"]
+                        else "📥 Got it. Your computer is off, I'll check the job when it's back.")
 
 
 ANSWER_WAIT = timedelta(minutes=30)

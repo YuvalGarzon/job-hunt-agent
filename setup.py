@@ -258,7 +258,7 @@ Rules:
   specialty: only if the degree names one. lead_project: the strongest project's id, or remove
   the key. related_job_words: only if some experience is outside the target field.
 - writing_rules: keep the example's banned_words and forbidden_words lists; adapt "never" to
-  this person.
+  this person, and always keep its rules about claims and soft skills.
 Answer with the YAML only, in one ```yaml block.
 
 ABOUT:

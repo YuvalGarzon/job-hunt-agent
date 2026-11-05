@@ -118,7 +118,7 @@ def test_photo_without_caption_is_a_job(sheet, sent):
     q = sheet.t("Queue").rows
     assert len(q) == 1 and q[0]["Type"] == "intake"
     assert json.loads(q[0]["Payload"])["media"][0]["file_id"] == "big"       # the largest size
-    assert "the image" in sent[-1]
+    assert "Reading the image" in sent[-1] and "job" not in sent[-1]          # not known to be a job yet
 
 
 def test_album_becomes_one_task(sheet, sent):
@@ -219,3 +219,29 @@ def test_cv_folder_without_company():
     from agent import cv_builder
     d = cv_builder.job_dir({"company": "?", "title": "Data Engineer"}, "2026-10-24")
     assert d.name == "Data Engineer - 2026-10-24"
+
+
+def test_image_with_no_job_goes_to_the_chat(sheet, sent, monkeypatch):
+    from agent import writing
+    monkeypatch.setattr(intake, "read_media", lambda media, tid: "Anything else we should know?\nType here...")
+    monkeypatch.setattr(intake, "collect", lambda text, urls, sheet: [])
+    asked = []
+    monkeypatch.setattr(writing, "chat", lambda sheet, task, payload, log: asked.append(payload) or "answered")
+    task = {"Task ID": "intake-9", "Result": ""}
+    sheet.t("Queue").append({**task, "Type": "intake", "Status": "in_progress"})
+    out = intake.run_task(sheet, task, {"text": "What should I write here?", "media": [{"file_id": "f"}]}, print)
+    assert out.startswith("no job") and len(asked) == 1
+    assert asked[0]["text"].startswith("What should I write here?") and "Anything else we should know?" in asked[0]["text"]
+    assert not any("didn't find a job" in m or "It's a job" in m for m in sent)
+
+
+def test_image_with_a_job_says_it_is_checking_it(sheet, sent, monkeypatch):
+    from agent.jobs import Job
+    monkeypatch.setattr(intake, "read_media", lambda media, tid: "Junior QA Engineer at Acme")
+    job = Job("telegram", "", "Acme", "Junior QA Engineer", "Manchester", "")
+    monkeypatch.setattr(intake, "collect", lambda text, urls, sheet: [job])
+    monkeypatch.setattr(intake, "send_job", lambda *a: 5)
+    task = {"Task ID": "intake-10", "Result": ""}
+    sheet.t("Queue").append({**task, "Type": "intake", "Status": "in_progress"})
+    intake.run_task(sheet, task, {"text": "", "media": [{"file_id": "f"}]}, print)
+    assert any("It's a job" in m and "Junior QA Engineer · Acme" in m and "Checking it" in m for m in sent)
